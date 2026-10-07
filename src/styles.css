@@ -318,3 +318,10 @@ footer {
 .batch-panel select { max-width: 380px; padding: 6px; }
 
 .auto-save-option { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 12px 0 8px; }
+
+.diagnostic-details > summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 15px; font-weight: 600; list-style: none; }
+.diagnostic-details > summary::-webkit-details-marker { display: none; }
+.diagnostic-details > summary:focus-visible { outline: 2px solid #175cd3; outline-offset: 4px; border-radius: 4px; }
+.diagnostic-chevron { flex-shrink: 0; transition: transform 150ms ease; }
+.diagnostic-details[open] .diagnostic-chevron { transform: rotate(180deg); }
+.diagnostic-content { padding-top: 14px; }

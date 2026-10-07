@@ -135,7 +135,7 @@ function App() {
       <header className="header">
         <div>
           <h1>SUAP Tools</h1>
-          <p>v0.5.0 · notas e aulas</p>
+          <p>v0.5.1 · notas e aulas</p>
         </div>
         <span className="readonly-badge">SAFE MODE</span>
       </header>
@@ -159,8 +159,12 @@ function App() {
 
       {activeTool === "notas" && (
         <>
-          <section className="card">
-            <h2>Diagnóstico</h2>
+          <details className="card diagnostic-details">
+            <summary>
+              <span>Diagnóstico</span>
+              <svg className="diagnostic-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </summary>
+            <div className="diagnostic-content">
 
             {gradeDiagnostics ? (
               <div className="diagnostics">
@@ -185,7 +189,8 @@ function App() {
             <button className="secondary" onClick={loadGrades} disabled={loading}>
               {loading ? "Lendo..." : "Ler página novamente"}
             </button>
-          </section>
+          </div>
+          </details>
 
           {gradebook?.ok && (
             <>
@@ -255,8 +260,12 @@ function App() {
       {activeTool === "aulas" && (
         <>
           <ClassesImport />
-          <section className="card">
-            <h2>Diagnóstico de aulas</h2>
+          <details className="card diagnostic-details">
+            <summary>
+              <span>Diagnóstico</span>
+              <svg className="diagnostic-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </summary>
+            <div className="diagnostic-content">
 
             {classDiagnostics ? (
               <div className="diagnostics">
@@ -282,7 +291,8 @@ function App() {
                 {loading ? "Lendo..." : "Ler aulas novamente"}
               </button>
             </div>
-          </section>
+          </div>
+          </details>
 
           {classesData?.ok && (
             <>
