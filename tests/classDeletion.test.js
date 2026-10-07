@@ -23,7 +23,7 @@ function setup({ wrongPassword = false, missingToken = false, loseResponse = fal
       return { type: 'opaqueredirect' };
     }
     const form = `<form id="excluirregistro_form" action="" method="POST">${missingToken ? '' : '<input type="hidden" name="csrfmiddlewaretoken" value="test-token">'}<input type="password" name="senha"><input type="submit" name="excluirregistro_form" value="Excluir"></form>`;
-    return { ok: true, text: async () => id ? form : html(rows) };
+    return { ok: true, text: async () => id ? form : rows.some((row) => row.unit === '1') ? html(rows) : html(rows).replace(/<table[^>]*>[\s\S]*?<\/table>/, '<div class="tab ajax-rendered" data-tab="aulas" data-counter="0"><p class="msg info">Nenhuma aula cadastrada.</p></div>') };
   };
   vm.runInContext(source, dom.getInternalVMContext());
   const api = dom.window.SuapClassParser;

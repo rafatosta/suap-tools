@@ -62,6 +62,16 @@
     });
   };
 
+  const readClassList = (root) => {
+    if (root.querySelector("#table_registro_aula")) return parseClasses(root);
+    const section = root.querySelector('.tab[data-tab="aulas"]');
+    const emptyMessage = Array.from((section || root).querySelectorAll(".msg, .empty, .empty-state"))
+      .some((element) => /nenhum(?:a)?\s+(?:aula|registro)|não\s+(?:há|existem)\s+aulas|sem\s+aulas/i.test(cleanText(element.textContent)));
+    const loadedEmpty = section?.classList.contains("ajax-rendered") && section.getAttribute("data-counter") === "0";
+    if (emptyMessage || loadedEmpty) return [];
+    throw new Error("Não foi possível consultar a lista de aulas. Abra Registro de Aulas no diário.");
+  };
+
   const extractClasses = () => {
     const currentUnit = getCurrentUnit();
     const addUrl = getAddClassUrl();
@@ -218,8 +228,7 @@
         return { doc, url: response.url || url };
       };
       const fresh = await fetchHtml(pageUrl);
-      if (!fresh.doc.querySelector("#table_registro_aula")) throw new Error("Não foi possível consultar a lista de aulas deste diário. Abra Registro de Aulas antes de cadastrar.");
-      if (parseClasses(fresh.doc).some((item) => identity(item) === key)) throw new Error("Esta aula já está registrada no diário.");
+      if (readClassList(fresh.doc).some((item) => identity(item) === key)) throw new Error("Esta aula já está registrada no diário.");
       const addUrl = initial.metadata.addClassUrl;
       if (!addUrl || new URL(addUrl, pageUrl).origin !== location.origin) throw new Error("Ação de cadastro indisponível neste diário.");
       const loaded = await fetchHtml(addUrl);
@@ -248,7 +257,7 @@
       // A POST response alone is not confirmation; read the persisted diary.
       for (let attempt = 0; attempt < 10; attempt++) {
         const saved = await fetchHtml(pageUrl);
-        if (parseClasses(saved.doc).some((item) => identity(item) === key)) return { ok: true, saved: true };
+        if (readClassList(saved.doc).some((item) => identity(item) === key)) return { ok: true, saved: true };
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
       return { ok: false, attempted: true, error: "Envio realizado, mas não foi possível confirmar o registro. Confira o diário antes de tentar novamente." };
@@ -275,8 +284,7 @@
   };
   const deletionRows = (doc, expectedUnit) => {
     if (expectedUnit && getCurrentUnit(doc).value !== expectedUnit) throw new Error("A consulta retornou outra unidade ou não identificou a unidade. A exclusão foi interrompida.");
-    if (!doc.querySelector("#table_registro_aula")) throw new Error("Não foi possível consultar a lista de aulas. Abra Registro de Aulas no diário.");
-    return parseClasses(doc);
+    return readClassList(doc);
   };
   const previewClassDeletion = async () => {
     const unit = getCurrentUnit().value;

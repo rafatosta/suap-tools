@@ -16,7 +16,7 @@ const form = `<form id="aula_form" method="post" action="${addUrl}">
 <select name="etapa"><option value="1">Unidade 1</option></select>
 <input name="data"><input name="quantidade"><textarea name="conteudo"></textarea>
 <select name="formato"><option value=""></option><option value="1">Síncrona</option><option value="2">Assíncrona</option></select></form>`;
-function setup({ alreadySaved = false, formHtml = form, refuse = false, losePost = false } = {}) {
+function setup({ alreadySaved = false, formHtml = form, refuse = false, losePost = false, emptyWithoutTable = false, unavailable = false } = {}) {
   const dom = new JSDOM(diary(), { url: pageUrl, runScripts: 'outside-only' });
   let saved = alreadySaved;
   const calls = [];
@@ -27,7 +27,7 @@ function setup({ alreadySaved = false, formHtml = form, refuse = false, losePost
       if (!refuse) saved = true;
       return { ok: true, url, text: async () => refuse ? '<ul class="errorlist"><li>Data fora do período</li></ul>' : diary(true) };
     }
-    return { ok: true, url, text: async () => url === pageUrl ? diary(saved) : formHtml };
+    return { ok: true, url, text: async () => url === pageUrl ? (unavailable ? '<div>Carregando...</div>' : emptyWithoutTable && !saved ? diary().replace(/<table[^>]*>[\s\S]*?<\/table>/, '<div class="tab ajax-rendered" data-tab="aulas" data-counter="0"><p class="msg info">Nenhuma aula cadastrada.</p></div>') : diary(saved)) : formHtml };
   };
   vm.runInContext(source, dom.getInternalVMContext());
   const register = (extra = {}) => dom.window.SuapClassParser.registerClass({ confirmed: true, row, diaryUrl: pageUrl, ...extra });
@@ -72,4 +72,19 @@ test('server refusal or unknown POST outcome is reported without automatic retry
     assert.equal(state.calls.filter((call) => call.method === 'POST').length, 1);
     state.dom.window.close();
   }
+});
+
+test('first class can be registered when SUAP omits the table for an empty unit', async () => {
+  const state = setup({ emptyWithoutTable: true });
+  const result = await state.register();
+  assert.equal(result.ok, true);
+  assert.equal(result.saved, true);
+  assert.equal(state.calls.filter((call) => call.method === 'POST').length, 1);
+  state.dom.window.close();
+});
+test('unloaded or unavailable class section is not mistaken for an empty unit', async () => {
+  const state = setup({ unavailable: true });
+  assert.equal((await state.register()).ok, false);
+  assert.equal(state.calls.filter((call) => call.method === 'POST').length, 0);
+  state.dom.window.close();
 });

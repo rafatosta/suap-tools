@@ -146,7 +146,7 @@ function App() {
       <header className="header">
         <div>
           <h1>SUAP Tools</h1>
-          <p>v0.6.0 · notas e aulas</p>
+          <p>v0.6.1 · notas e aulas</p>
         </div>
         <span className="readonly-badge">SAFE MODE</span>
       </header>
