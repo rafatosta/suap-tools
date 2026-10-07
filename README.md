@@ -1,7 +1,7 @@
 # SUAP Tools
 
 Extensão React/Vite Manifest V3 para tarefas no SUAP IFBA, usando a sessão
-já autenticada no navegador. Não altera notas. Exclusão de aulas exige prévia, senha e confirmação explícita.
+já autenticada no navegador. Alterações de notas exigem prévia e confirmação. Exclusão de aulas exige também senha.
 
 ## Importar e cadastrar aulas — v0.5
 
@@ -136,3 +136,45 @@ listadas para exclusão. As anteriores e as de outras unidades são preservadas.
 Confira os registros, informe a senha e marque a confirmação. A data e o modo
 ficam vinculados à prévia; alterá-los descarta a prévia e a confirmação. Após
 a exclusão, importe uma nova planilha com o horário desejado.
+
+## Importação de notas — v0.9
+
+Abra Registro de Notas/Conceitos no SUAP e selecione SUAP Tools → Notas →
+**Importar notas nesta página**. O painel aparece na página atual.
+
+São aceitos CSVs UTF-8, separados por ponto e vírgula ou vírgula, com até 5 MB:
+
+- Uma avaliação: `Matrícula;Nota`. Escolha a unidade e a avaliação de destino.
+- Várias avaliações: `Matrícula;Nota1;Nota2;Nota3`. Use somente as colunas
+  necessárias e associe cada uma a uma avaliação editável diferente.
+
+Os modelos para download têm apenas cabeçalhos. Matrículas são tratadas como
+texto, preservando zeros iniciais. Notas podem usar ponto ou vírgula decimal
+e até duas casas decimais. Célula vazia não altera a nota existente; `0` lança
+zero. Matrículas repetidas, desconhecidas ou inativas e notas fora do limite
+real de cada avaliação bloqueiam a prévia. Recuperações e médias não são
+alvos de importação nesta versão.
+
+Clique em **Validar e mostrar prévia** para conferir matrícula, aluno, avaliação,
+nota atual e nova nota. Autorize substituições, se houver, e marque a confirmação
+antes de **Enviar notas**. A confirmação é descartada ao alterar arquivo,
+unidade ou vínculo das colunas.
+
+O HTML do SUAP mostra que `validar_nota` salva cada nota pelo endpoint
+`registrar_nota_ajax`. A extensão usa esse mesmo fluxo por aluno/avaliação,
+sem enviar o formulário inteiro e sem alterar campos ausentes do CSV. O limite
+e os identificadores são lidos dos campos editáveis da página, sem executar
+JavaScript recebido do HTML.
+
+Cada nota é consultada novamente antes do envio e confirmada no diário após
+a resposta do SUAP. Notas já iguais são ignoradas. Mudanças desde a prévia e
+resultados incertos interrompem o lote sem reenvio automático. **Parar após a
+nota atual** impede as próximas alterações. Atualize a prévia antes de retomar
+um lote parcial; notas que já foram salvas aparecerão como inalteradas.
+
+A prévia expira em dez minutos. Dados dos alunos e notas permanecem apenas na
+memória do painel; nenhum lançamento é feito só por selecionar o arquivo.
+
+Após confirmar cada nota, o valor correspondente é atualizado também no
+campo da página atual, sem disparar outro salvamento. Feche o painel e
+recarregue o SUAP para atualizar as médias e o resumo do diário.

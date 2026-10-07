@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import GradesImport from "./components/GradesImport";
 import ClassesShift from "./components/ClassesShift";
 import ClassesDelete from "./components/ClassesDelete";
 import ClassesImport from "./components/ClassesImport";
@@ -37,6 +38,7 @@ function DiagnosticItem({ ok, children }) {
 }
 
 function App() {
+  const gradeWorkspace = new URLSearchParams(window.location.search).get("view") === "grade-import";
   const importWorkspace = new URLSearchParams(window.location.search).get("view") === "class-import";
   const targetTabId = Number(new URLSearchParams(window.location.search).get("targetTab"));
   const [importRunning, setImportRunning] = useState(false);
@@ -101,11 +103,11 @@ function App() {
   };
 
   useEffect(() => {
-    if (!importWorkspace) loadGrades();
+    if (!importWorkspace && !gradeWorkspace) loadGrades();
   }, []);
 
   useEffect(() => {
-    if (!importWorkspace && activeTool === "aulas") loadClasses();
+    if (!importWorkspace && !gradeWorkspace && activeTool === "aulas") loadClasses();
   }, [activeTool]);
 
   const gradePreview = useMemo(
@@ -130,6 +132,13 @@ function App() {
   const gradeDiagnostics = gradebook?.diagnostics;
   const classDiagnostics = classesData?.diagnostics;
 
+  if (gradeWorkspace) {
+    return <main className="app import-workspace">
+      <header className="header"><div><h1>SUAP Tools · Notas</h1><p>Importação no diário atual</p></div><button className="secondary" disabled={importRunning} onClick={() => chrome.tabs.sendMessage(targetTabId, { type: "SUAP_TOOLS_CLOSE_IMPORT_PANEL" })}>Fechar</button></header>
+      <GradesImport workspace targetTabId={targetTabId} onRunningChange={setImportRunning} />
+      <footer>Revise a unidade, as avaliações e os alunos antes de confirmar. As notas não listadas na prévia serão preservadas.</footer>
+    </main>;
+  }
   if (importWorkspace) {
     return <main className="app import-workspace">
       <header className="header">
@@ -148,7 +157,7 @@ function App() {
       <header className="header">
         <div>
           <h1>SUAP Tools</h1>
-          <p>v0.8.0 · notas e aulas</p>
+          <p>v0.9.0 · notas e aulas</p>
         </div>
         <span className="readonly-badge">SAFE MODE</span>
       </header>
@@ -172,6 +181,7 @@ function App() {
 
       {activeTool === "notas" && (
         <>
+          <GradesImport />
           <details className="card diagnostic-details">
             <summary>
               <span>Diagnóstico</span>
@@ -192,7 +202,7 @@ function App() {
                   {gradeDiagnostics.studentCount} aluno(s) identificado(s)
                 </DiagnosticItem>
                 <DiagnosticItem ok={!gradeDiagnostics.writableActionsUsed}>
-                  Nenhuma ação de escrita executada
+                  Leitura de notas não altera registros
                 </DiagnosticItem>
               </div>
             ) : (
@@ -362,7 +372,7 @@ function App() {
       )}
 
       <footer>
-        O envio automático e a exclusão de aulas exigem confirmação no painel.
+        Alterações de notas e aulas exigem confirmação no painel.
       </footer>
     </main>
   );

@@ -2,11 +2,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   try {
     if (message?.type === "SUAP_TOOLS_OPEN_IMPORT_PANEL") {
       const existing = document.getElementById("suap-tools-import-panel");
-      if (existing) { sendResponse({ ok: true }); return; }
+      if (existing) {
+        const wanted = message.section === "grades" ? "grade-import" : "class-import";
+        if (new URL(existing.src).searchParams.get("view") !== wanted) { sendResponse({ ok: false, error: "Feche o painel atual antes de abrir outro módulo." }); return; }
+        sendResponse({ ok: true }); return;
+      }
       const panel = document.createElement("iframe");
       panel.id = "suap-tools-import-panel";
-      panel.title = "Importar aulas — SUAP Tools";
-      panel.src = chrome.runtime.getURL("index.html?view=class-import&targetTab=" + message.tabId + (["delete", "shift"].includes(message.section) ? "&section=" + message.section : ""));
+      panel.title = message.section === "grades" ? "Importar notas — SUAP Tools" : "Importar aulas — SUAP Tools";
+      panel.src = chrome.runtime.getURL("index.html?view=" + (message.section === "grades" ? "grade-import" : "class-import") + "&targetTab=" + message.tabId + (["delete", "shift"].includes(message.section) ? "&section=" + message.section : ""));
       panel.style.cssText = "position:fixed;inset:12px 12px 12px auto;width:min(960px,95vw);height:calc(100vh - 24px);z-index:2147483647;border:1px solid #d0d5dd;border-radius:12px;background:white;box-shadow:0 10px 40px #0004";
       document.body.append(panel);
       sendResponse({ ok: true }); return;
@@ -25,6 +29,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const parser = globalThis.SuapClassParser;
       const operation = message.type === "SUAP_TOOLS_PREVIEW_CLASS_SHIFT" ? parser.previewClassShift(message.payload ?? {}) : parser.applyPlannedClassShift(message.payload ?? {});
       operation.then(sendResponse, () => sendResponse({ ok: false, error: "Não foi possível confirmar a edição. Confira o diário." }));
+      return true;
+    }
+    if (message?.type === "SUAP_TOOLS_GRADES_CATALOG") {
+      sendResponse(globalThis.SuapGradeParser.getImportCatalog()); return;
+    }
+    if (message?.type === "SUAP_TOOLS_PREVIEW_GRADE_IMPORT" || message?.type === "SUAP_TOOLS_SAVE_PLANNED_GRADE") {
+      const parser = globalThis.SuapGradeParser;
+      const operation = message.type === "SUAP_TOOLS_PREVIEW_GRADE_IMPORT" ? parser.previewGradeImport(message.payload ?? {}) : parser.savePlannedGrade(message.payload ?? {});
+      operation.then(sendResponse, () => sendResponse({ ok: false, error: "Não foi possível confirmar a nota. Confira o diário." }));
       return true;
     }
     if (message?.type === "SUAP_TOOLS_REGISTER_CLASS") {
