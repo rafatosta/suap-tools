@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // Render the actual JSX entry in both extension views without launching SUAP.
-test("file selection stays in the dedicated tab, outside the transient popup", async () => {
+test("file selection stays in the same-page panel, outside the transient popup", async () => {
   const bundle = await build({
     configFile: false, esbuild: { jsx: "automatic" },
     logLevel: "silent",
@@ -19,7 +19,7 @@ test("file selection stays in the dedicated tab, outside the transient popup", a
   try {
     const workspace = renderToStaticMarkup(createElement(App));
     assert.match(workspace, /type="file"/);
-    assert.match(workspace, /Importação e prévia/);
+    assert.match(workspace, /Importação no diário atual/);
     assert.doesNotMatch(workspace, /Diagnóstico de aulas/);
     assert.doesNotMatch(workspace, /Preencher diálogo aberto/);
     // Check the popup component directly because the default App opens Notas.
@@ -30,7 +30,7 @@ test("file selection stays in the dedicated tab, outside the transient popup", a
         (_, quote, name) => `from ${quote}${import.meta.resolve(name)}${quote}`);
     const { default: ClassesImport } = await import("data:text/javascript;base64," + Buffer.from(componentCode).toString("base64"));
     const popup = renderToStaticMarkup(createElement(ClassesImport));
-    assert.match(popup, /Abrir importação em uma aba/);
+    assert.match(popup, /Importar aulas nesta página/);
     assert.doesNotMatch(popup, /type="file"/);
   } finally { delete globalThis.window; }
 });
@@ -46,5 +46,5 @@ test("automatic saving is visibly optional and unchecked by default", async () =
   assert.match(html, /type="checkbox"/);
   assert.doesNotMatch(html, /checked=""/);
   assert.match(html, /Enviar e salvar automaticamente todas as aulas deste lote/);
-  assert.match(html, /Desmarcado: você revisa e clica em Salvar/);
+  assert.match(html, /Desmarcado: você confirma o cadastro de uma aula/);
 });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SUAP Tools",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Ferramentas para o SUAP. Leitura de notas e aulas, importação padronizada e envio automático opcional de aulas.",
   "permissions": [
     "activeTab"
@@ -24,6 +24,17 @@
         "content.js"
       ],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "index.html",
+        "assets/*"
+      ],
+      "matches": [
+        "https://suap.ifba.edu.br/*"
+      ]
     }
   ]
 }

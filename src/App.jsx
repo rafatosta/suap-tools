@@ -36,19 +36,13 @@ function DiagnosticItem({ ok, children }) {
 
 function App() {
   const importWorkspace = new URLSearchParams(window.location.search).get("view") === "class-import";
+  const targetTabId = Number(new URLSearchParams(window.location.search).get("targetTab"));
+  const [importRunning, setImportRunning] = useState(false);
   const [activeTool, setActiveTool] = useState("notas");
   const [gradebook, setGradebook] = useState(null);
   const [classesData, setClassesData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [classFormStatus, setClassFormStatus] = useState("");
-  const [classForm, setClassForm] = useState({
-    quantidade: "1",
-    etapa: "1",
-    data: "",
-    formato: "",
-    conteudo: "",
-  });
 
   const loadGrades = async () => {
     setLoading(true);
@@ -79,7 +73,6 @@ function App() {
   const loadClasses = async () => {
     setLoading(true);
     setError("");
-    setClassFormStatus("");
 
     try {
       const result = await sendMessage("SUAP_TOOLS_EXTRACT_CLASSES");
@@ -96,12 +89,7 @@ function App() {
 
       setClassesData(result);
 
-      if (result?.metadata?.unit?.value) {
-        setClassForm((current) => ({
-          ...current,
-          etapa: result.metadata.unit.value,
-        }));
-      }
+
     } catch (err) {
       setClassesData(null);
       setError(err instanceof Error ? err.message : String(err));
@@ -128,55 +116,17 @@ function App() {
     [classesData]
   );
 
-  const openClassForm = async () => {
-    setError("");
-    setClassFormStatus("");
-
-    try {
-      const result = await sendMessage("SUAP_TOOLS_OPEN_CLASS_FORM");
-      if (!result?.ok) {
-        throw new Error(result?.error || "Não foi possível abrir o formulário de aula.");
-      }
-
-      setClassFormStatus(
-        "Formulário nativo aberto no SUAP. Reabra a extensão depois de o diálogo aparecer."
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const fillClassForm = async () => {
-    setError("");
-    setClassFormStatus("");
-
-    try {
-      const result = await sendMessage("SUAP_TOOLS_FILL_CLASS_FORM", classForm);
-
-      if (!result?.ok) {
-        throw new Error(
-          result?.error ||
-            "Não foi possível preencher o formulário. Abra primeiro o diálogo 'Adicionar Aula'."
-        );
-      }
-
-      setClassFormStatus(result.message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
   const gradeDiagnostics = gradebook?.diagnostics;
   const classDiagnostics = classesData?.diagnostics;
 
   if (importWorkspace) {
     return <main className="app import-workspace">
       <header className="header">
-        <div><h1>SUAP Tools · Aulas</h1><p>Importação e prévia</p></div>
-        <span className="readonly-badge">ENVIO OPCIONAL</span>
+        <div><h1>SUAP Tools · Aulas</h1><p>Importação no diário atual</p></div>
+        <button className="secondary" disabled={importRunning} onClick={() => chrome.tabs.sendMessage(targetTabId, { type: "SUAP_TOOLS_CLOSE_IMPORT_PANEL" })}>Fechar</button>
       </header>
-      <ClassesImport workspace />
-      <footer>Mantenha esta aba aberta durante a revisão. Os dados são descartados ao recarregar ou fechar esta aba. O envio automático depende da opção escolhida antes de iniciar o lote.</footer>
+      <ClassesImport workspace targetTabId={targetTabId} onRunningChange={setImportRunning} />
+      <footer>Os dados são descartados ao fechar este painel ou recarregar a página. O envio automático depende da opção escolhida antes de iniciar o lote.</footer>
     </main>;
   }
 
@@ -185,7 +135,7 @@ function App() {
       <header className="header">
         <div>
           <h1>SUAP Tools</h1>
-          <p>v0.4.0 · notas e aulas</p>
+          <p>v0.5.0 · notas e aulas</p>
         </div>
         <span className="readonly-badge">SAFE MODE</span>
       </header>
@@ -331,9 +281,6 @@ function App() {
               <button className="secondary" onClick={loadClasses} disabled={loading}>
                 {loading ? "Lendo..." : "Ler aulas novamente"}
               </button>
-              <button className="secondary" onClick={openClassForm}>
-                Abrir Adicionar Aula
-              </button>
             </div>
           </section>
 
@@ -383,86 +330,7 @@ function App() {
                 )}
               </section>
 
-              <section className="card">
-                <h2>Preencher formulário nativo</h2>
-                <p className="muted form-help">
-                  Esta ferramenta só preenche o diálogo do SUAP. O botão Salvar deve
-                  ser acionado manualmente por você.
-                </p>
 
-                <div className="form-grid">
-                  <label>
-                    Quantidade
-                    <input
-                      type="number"
-                      min="0"
-                      value={classForm.quantidade}
-                      onChange={(event) =>
-                        setClassForm({ ...classForm, quantidade: event.target.value })
-                      }
-                    />
-                  </label>
-
-                  <label>
-                    Unidade
-                    <select
-                      value={classForm.etapa}
-                      onChange={(event) =>
-                        setClassForm({ ...classForm, etapa: event.target.value })
-                      }
-                    >
-                      <option value="1">Unidade 1</option>
-                      <option value="2">Unidade 2</option>
-                      <option value="3">Unidade 3</option>
-                    </select>
-                  </label>
-
-                  <label>
-                    Data
-                    <input
-                      type="text"
-                      placeholder="dd/mm/aaaa"
-                      value={classForm.data}
-                      onChange={(event) =>
-                        setClassForm({ ...classForm, data: event.target.value })
-                      }
-                    />
-                  </label>
-
-                  <label>
-                    Formato
-                    <select
-                      value={classForm.formato}
-                      onChange={(event) =>
-                        setClassForm({ ...classForm, formato: event.target.value })
-                      }
-                    >
-                      <option value="">Não informado</option>
-                      <option value="1">Síncrona</option>
-                      <option value="2">Assíncrona</option>
-                    </select>
-                  </label>
-
-                  <label className="full">
-                    Conteúdo
-                    <textarea
-                      rows="5"
-                      value={classForm.conteudo}
-                      onChange={(event) =>
-                        setClassForm({ ...classForm, conteudo: event.target.value })
-                      }
-                    />
-                  </label>
-                </div>
-
-                <button className="primary" onClick={fillClassForm}>
-                  Preencher diálogo aberto
-                </button>
-
-                {classFormStatus && (
-                  <div className="success-message">{classFormStatus}</div>
-                )}
-              </section>
             </>
           )}
         </>

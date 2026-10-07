@@ -34,8 +34,8 @@
     return link?.href || "";
   };
 
-  const parseClasses = () => {
-    const table = document.querySelector("#table_registro_aula");
+  const parseClasses = (root = document) => {
+    const table = root.querySelector("#table_registro_aula");
     if (!table) return [];
 
     const rows = Array.from(table.querySelectorAll(":scope > tbody > tr"));
@@ -192,6 +192,71 @@
     };
   };
 
+  let registrationBusy = false;
+  const registerClass = async (payload = {}) => {
+    if (payload.confirmed !== true) return { ok: false, error: "Confirme o cadastro antes de enviar." };
+    if (registrationBusy) return { ok: false, error: "Há um cadastro em andamento. Aguarde a confirmação." };
+    registrationBusy = true;
+    let posted = false;
+    try {
+      const row = payload.row;
+      if (!row || !["1", "2", "3"].includes(row.unidade) || !/^\d+$/.test(row.quantidade) || Number(row.quantidade) <= 0 || !cleanText(row.conteudo) || !["", "Síncrona", "Assíncrona"].includes(row.formato)) throw new Error("A linha de aula é inválida.");
+      const parts = String(row.data).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      const date = new Date(0);
+      if (parts) date.setUTCFullYear(Number(parts[3]), Number(parts[2]) - 1, Number(parts[1]));
+      if (!parts || Number(parts[3]) < 1 || date.getUTCFullYear() !== Number(parts[3]) || date.getUTCMonth() !== Number(parts[2]) - 1 || date.getUTCDate() !== Number(parts[1])) throw new Error("A data da aula é inválida.");
+      const initial = extractClasses();
+      if (!initial.ok || initial.metadata.unit.value !== row.unidade || payload.diaryUrl !== location.href) throw new Error("O diário ou a unidade de destino mudou. Confira a página atual.");
+      const identity = (item) => JSON.stringify([cleanText(item.unidade).replace(/^Unidade\s+/i, ""), item.data, Number(item.quantidade), cleanText(item.conteudo)]);
+      const key = identity(row);
+      const pageUrl = location.href;
+      const fetchHtml = async (url, options = {}) => {
+        const response = await fetch(url, { credentials: "same-origin", cache: "no-store", ...options });
+        if (!response.ok || new URL(response.url || url, pageUrl).origin !== location.origin) throw new Error("O SUAP não respondeu ao cadastro. Confira sua sessão.");
+        const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+        if (doc.querySelector('input[name="password"]')) throw new Error("Sua sessão expirou. Entre novamente no SUAP.");
+        return { doc, url: response.url || url };
+      };
+      const fresh = await fetchHtml(pageUrl);
+      if (!fresh.doc.querySelector("#table_registro_aula")) throw new Error("Não foi possível consultar a lista de aulas deste diário. Abra Registro de Aulas antes de cadastrar.");
+      if (parseClasses(fresh.doc).some((item) => identity(item) === key)) throw new Error("Esta aula já está registrada no diário.");
+      const addUrl = initial.metadata.addClassUrl;
+      if (!addUrl || new URL(addUrl, pageUrl).origin !== location.origin) throw new Error("Ação de cadastro indisponível neste diário.");
+      const loaded = await fetchHtml(addUrl);
+      const form = loaded.doc.querySelector("#aula_form");
+      if (!form || form.method.toLowerCase() !== "post") throw new Error("O SUAP não disponibilizou os campos necessários para cadastrar a aula.");
+      const action = new URL(form.getAttribute("action") || loaded.url, loaded.url);
+      if (action.origin !== location.origin) throw new Error("Destino de cadastro inválido.");
+      const values = new URLSearchParams();
+      for (const field of form.querySelectorAll("input, select, textarea")) {
+        if (!field.name || field.disabled || ["submit", "button", "file", "reset"].includes(field.type) || (["checkbox", "radio"].includes(field.type) && !field.checked)) continue;
+        values.append(field.name, field.value);
+      }
+      if (!values.get("csrfmiddlewaretoken") || !values.get("professor_diario")) throw new Error("O SUAP não informou o professor ou a autorização do cadastro. Confira o diário.");
+      const expected = { quantidade: row.quantidade, etapa: row.unidade, data: row.data,
+        conteudo: row.conteudo, formato: { "": "", "Síncrona": "1", "Assíncrona": "2" }[row.formato] };
+      for (const [name, value] of Object.entries(expected)) {
+        const field = form.querySelector(`[name="${name}"]`);
+        if (!field || field.disabled || (field.tagName === "SELECT" && !Array.from(field.options).some((option) => option.value === value && !option.disabled))) throw new Error(`Campo indisponível para cadastro: ${name}.`);
+        values.set(name, value);
+      }
+      if (location.href !== pageUrl || getCurrentUnit().value !== row.unidade) throw new Error("O diário ou a unidade mudou antes do envio.");
+      posted = true;
+      const result = await fetchHtml(action.href, { method: "POST", body: values });
+      const errors = Array.from(result.doc.querySelectorAll(".errorlist, .errornote")).map((element) => cleanText(element.textContent)).filter(Boolean);
+      if (errors.length) return { ok: false, error: errors.join(" "), attempted: true };
+      // A POST response alone is not confirmation; read the persisted diary.
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const saved = await fetchHtml(pageUrl);
+        if (parseClasses(saved.doc).some((item) => identity(item) === key)) return { ok: true, saved: true };
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      return { ok: false, attempted: true, error: "Envio realizado, mas não foi possível confirmar o registro. Confira o diário antes de tentar novamente." };
+    } catch (error) {
+      return { ok: false, attempted: posted, error: error.message + (posted ? " Confira o diário; o envio não será repetido automaticamente." : "") };
+    } finally { registrationBusy = false; }
+  };
+
   const submittedForms = new WeakMap();
   const submitClassForm = (payload = {}) => {
     if (payload.confirmedAutoSave !== true) return { ok: false, error: "O envio automático não foi autorizado para este lote." };
@@ -243,5 +308,6 @@
     fillClassForm,
     openClassForm,
     submitClassForm,
+    registerClass,
   };
 })();

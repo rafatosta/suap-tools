@@ -2,7 +2,7 @@ import ClassesBatch from "./ClassesBatch";
 import { useState } from "react";
 import { downloadClassesTemplate, importClassesFile } from "../services/classesImport";
 
-export default function ClassesImport({ workspace = false }) {
+export default function ClassesImport({ workspace = false, targetTabId, onRunningChange = () => {} }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,24 +23,29 @@ export default function ClassesImport({ workspace = false }) {
   async function openWorkspace() {
     setError("");
     try {
-      await chrome.tabs.create({ url: chrome.runtime.getURL("index.html?view=class-import") });
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.url?.startsWith("https://suap.ifba.edu.br/")) throw new Error("Abra o diário no SUAP antes de importar aulas.");
+      const response = await chrome.tabs.sendMessage(tab.id, { type: "SUAP_TOOLS_OPEN_IMPORT_PANEL", tabId: tab.id });
+      if (!response?.ok) throw new Error(response?.error || "Não foi possível abrir a importação.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível abrir a aba de importação.");
+      setError(err instanceof Error ? err.message : "Não foi possível abrir o painel de importação.");
     }
   }
   const valid = result?.rows.filter((row) => !row.errors.length) ?? [];
   const invalid = result?.rows.filter((row) => row.errors.length) ?? [];
   return <section className="card import-card">
-    <h2>Importar aulas · prévia e preenchimento</h2>
+    <h2>Importar aulas</h2>
+    <details className="form-help"><summary>Formato do arquivo</summary>
     <p className="muted form-help">Use os cabeçalhos exatos Unidade, Data, Quantidade, Conteúdo e, opcionalmente, Formato. CSV separado por ponto e vírgula ou vírgula; XLSX com uma única aba. A ordem das colunas pode variar.</p>
     <p className="muted form-help">Unidade: 1, 2 ou 3. Data: dd/mm/aaaa (texto no XLSX). Quantidade: inteiro positivo. Conteúdo: obrigatório. Formato: vazio, Síncrona ou Assíncrona. O CSV de exportação das aulas registradas tem outro formato; use este modelo.</p>
+    </details>
     <div className="button-row">
       <button className="secondary" onClick={downloadClassesTemplate}>Baixar modelo CSV</button>
       {workspace ? <label className="import-label">Importar CSV/XLSX
         <input type="file" accept=".csv,.xlsx" onChange={importFile} disabled={busy || batchRunning} />
-      </label> : <button className="primary" onClick={openWorkspace}>Abrir importação em uma aba</button>}
+      </label> : <button className="primary" onClick={openWorkspace}>Importar aulas nesta página</button>}
     </div>
-    {!workspace && <p className="muted import-safety">Selecione o arquivo na aba de importação. Ela permanece aberta para mostrar a prévia e os erros.</p>}
+    {!workspace && <p className="muted import-safety">A importação aparece nesta página do SUAP, sem abrir outra aba.</p>}
     <div aria-live="polite">
       {busy && <p className="muted">Validando arquivo...</p>}
       {filename && <p className="import-filename">{filename}</p>}
@@ -55,7 +60,7 @@ export default function ClassesImport({ workspace = false }) {
       </>}
     </div>
     {workspace && result && !result.columnErrors.length && result.rows.length > 0 &&
-      <ClassesBatch key={filename + JSON.stringify(result.rows)} rows={result.rows} onRunningChange={setBatchRunning} />}
-    <p className="muted import-safety">A seleção do arquivo apenas valida e mostra a prévia. O preenchimento começa quando você inicia o lote; o salvamento só é automático se você marcar a opção de envio do lote.</p>
+      <ClassesBatch key={filename + JSON.stringify(result.rows)} rows={result.rows} targetTabId={targetTabId} onRunningChange={(running) => { setBatchRunning(running); onRunningChange(running); }} />}
+    <p className="muted import-safety">A seleção do arquivo apenas valida e mostra a prévia. O cadastro começa quando você confirma o envio; o salvamento só é automático se você marcar a opção de envio do lote.</p>
   </section>;
 }
