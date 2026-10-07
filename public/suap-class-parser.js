@@ -277,7 +277,7 @@
   const deleteFingerprint = (row) => JSON.stringify([deleteId(row.deleteUrl), deleteUnit(row.unidade), row.data, Number(row.quantidade), cleanText(row.conteudo)]);
   const readDeletionPage = async (url) => {
     const response = await fetch(url, { credentials: "same-origin", cache: "no-store", redirect: "error" });
-    if (!response.ok) throw new Error("Não foi possível consultar a exclusão no SUAP. Confira sua sessão.");
+    if (!response.ok) throw new Error("Não foi possível consultar o SUAP. Confira sua sessão.");
     const doc = new DOMParser().parseFromString(await response.text(), "text/html");
     if (doc.querySelector('input[name="password"]')) throw new Error("Sua sessão expirou. Entre novamente no SUAP.");
     return doc;
@@ -362,6 +362,105 @@
     }
   };
 
+  const shiftPlans = new Map();
+  const parseShiftDate = (value) => {
+    const match = String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) throw new Error("Informe uma data válida no formato dd/mm/aaaa.");
+    const date = new Date(0);
+    date.setUTCFullYear(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+    if (date.getUTCFullYear() !== Number(match[3]) || date.getUTCMonth() !== Number(match[2]) - 1 || date.getUTCDate() !== Number(match[1]) || Number(match[3]) < 1) throw new Error("A data informada não é válida.");
+    return date;
+  };
+  const shiftDateText = (date) => `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${String(date.getUTCFullYear()).padStart(4, "0")}`;
+  const editIdentity = (url) => {
+    try {
+      const parsed = new URL(url, location.href);
+      const match = parsed.pathname.match(/^\/edu\/adicionar_aula_diario\/(\d+)\/([123])\/(\d+)\/$/);
+      return parsed.origin === location.origin && match ? { diary: match[1], unit: match[2], id: match[3], path: parsed.pathname } : null;
+    } catch { return null; }
+  };
+  const shiftFingerprint = (row) => JSON.stringify([editIdentity(row.editUrl)?.id, deleteUnit(row.unidade), row.data, Number(row.quantidade), cleanText(row.conteudo), cleanText(row.professor)]);
+  const previewClassShift = async (payload = {}) => {
+    try {
+      const start = parseShiftDate(payload.startDate);
+      const days = Number(payload.days);
+      if (!Number.isSafeInteger(days) || days === 0 || Math.abs(days) > 36600) throw new Error("Informe um deslocamento inteiro, diferente de zero, em dias (até 36600 dias).");
+      const unit = getCurrentUnit().value;
+      if (!["1", "2", "3"].includes(unit)) throw new Error("Selecione a unidade no diário.");
+      const diaryUrl = location.href;
+      const rows = deletionRows(await readDeletionPage(diaryUrl), unit).filter((row) => deleteUnit(row.unidade) === unit);
+      const diaryId = location.pathname.match(/\/edu\/meu_diario\/(\d+)\//)?.[1] || new URL(getAddClassUrl() || location.href, location.href).pathname.match(/\/edu\/adicionar_aula_diario\/(\d+)\//)?.[1];
+      if (!diaryId) throw new Error("Não foi possível identificar o diário de destino.");
+      const affected = rows.filter((row) => parseShiftDate(row.data) >= start).map((row) => {
+        const edit = editIdentity(row.editUrl);
+        if (!edit || edit.unit !== unit || edit.diary !== diaryId) throw new Error("Uma aula não possui ação de edição compatível com a unidade.");
+        const date = parseShiftDate(row.data);
+        date.setUTCDate(date.getUTCDate() + days);
+        if (date.getUTCFullYear() < 1 || date.getUTCFullYear() > 9999) throw new Error("O deslocamento ultrapassa o intervalo de datas permitido.");
+        return { ...row, id: edit.id, newDate: shiftDateText(date) };
+      });
+      const unchanged = rows.filter((row) => parseShiftDate(row.data) < start);
+      if (affected.some((row) => unchanged.some((other) => other.data === row.newDate))) throw new Error("O deslocamento coincide com uma aula anterior à data inicial. Ajuste os dias ou a data inicial.");
+      // Move later classes first for a positive offset; earlier classes first
+      // for a negative offset, avoiding transient collisions with moved dates.
+      affected.sort((a, b) => days > 0 ? parseShiftDate(b.data) - parseShiftDate(a.data) : parseShiftDate(a.data) - parseShiftDate(b.data));
+      for (const [id, plan] of shiftPlans) if (plan.expires < Date.now()) shiftPlans.delete(id);
+      const planId = crypto.randomUUID();
+      shiftPlans.set(planId, { diaryUrl, unit, rows: affected, remaining: new Set(affected.map((row) => row.id)), expires: Date.now() + 10 * 60 * 1000 });
+      return { ok: true, planId, title: document.title, unit, startDate: payload.startDate, days, unchangedCount: unchanged.length,
+        rows: affected.map((row) => ({ id: row.id, data: row.data, newDate: row.newDate, quantidade: row.quantidade, conteudo: row.conteudo })) };
+    } catch (error) { return { ok: false, error: error.message }; }
+  };
+  const applyPlannedClassShift = async (payload = {}) => {
+    const plan = shiftPlans.get(payload.planId);
+    if (payload.confirmed !== true || !plan || plan.expires < Date.now()) return { ok: false, attempted: false, error: "Atualize a prévia e confirme o deslocamento." };
+    const expected = plan.rows.find((row) => row.id === payload.id);
+    if (!expected || !plan.remaining.has(payload.id)) return { ok: false, attempted: false, error: "A aula não pertence ao plano ou já foi deslocada." };
+    if (registrationBusy) return { ok: false, attempted: false, error: "Outra operação está em andamento." };
+    registrationBusy = true;
+    let attempted = false;
+    try {
+      if (location.href !== plan.diaryUrl || getCurrentUnit().value !== plan.unit) throw new Error("O diário ou a unidade mudou. O deslocamento foi interrompido.");
+      const current = deletionRows(await readDeletionPage(plan.diaryUrl), plan.unit).find((row) => editIdentity(row.editUrl)?.id === payload.id);
+      if (!current || shiftFingerprint(current) !== shiftFingerprint(expected)) throw new Error("A aula mudou desde a prévia. Confira as datas antes de continuar.");
+      const editUrl = new URL(expected.editUrl, plan.diaryUrl);
+      const doc = await readDeletionPage(editUrl.href);
+      const form = doc.querySelector("#aula_form");
+      if (!form || form.method.toLowerCase() !== "post") throw new Error("O SUAP não disponibilizou a edição da aula.");
+      const action = new URL(form.getAttribute("action") || editUrl.href, editUrl.href);
+      if (editIdentity(action.href)?.path !== editIdentity(editUrl.href)?.path) throw new Error("Destino de edição inválido.");
+      const body = new URLSearchParams();
+      for (const field of form.querySelectorAll("input, select, textarea")) {
+        if (!field.name || field.disabled || ["submit", "button", "file", "reset"].includes(field.type) || (["checkbox", "radio"].includes(field.type) && !field.checked)) continue;
+        if (field.tagName === "SELECT" && field.multiple) for (const option of field.selectedOptions) body.append(field.name, option.value);
+        else body.append(field.name, field.value);
+      }
+      const dateField = form.querySelector('[name="data"]');
+      if (!body.get("csrfmiddlewaretoken") || !body.get("professor_diario") || !dateField || dateField.disabled || dateField.readOnly) throw new Error("O SUAP não informou os campos necessários para editar a aula.");
+      if (body.get("data") !== expected.data || body.get("etapa") !== plan.unit || Number(body.get("quantidade")) !== Number(expected.quantidade) || cleanText(body.get("conteudo")) !== cleanText(expected.conteudo)) throw new Error("Os campos da aula não correspondem à prévia. O deslocamento foi interrompido.");
+      body.set("data", expected.newDate); // All other original fields remain intact.
+      if (location.href !== plan.diaryUrl || getCurrentUnit().value !== plan.unit) throw new Error("O destino mudou antes da edição.");
+      attempted = true;
+      const response = await fetch(action.href, { method: "POST", body, credentials: "same-origin", cache: "no-store", redirect: "manual" });
+      if (response.type !== "opaqueredirect") {
+        if (!response.ok) throw new Error("O SUAP recusou a edição da data.");
+        const result = new DOMParser().parseFromString(await response.text(), "text/html");
+        const errors = Array.from(result.querySelectorAll(".errorlist, .errornote, .msg.error")).map((element) => cleanText(element.textContent)).filter(Boolean);
+        if (errors.length) throw new Error(errors.join(" "));
+      }
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const saved = deletionRows(await readDeletionPage(plan.diaryUrl), plan.unit).find((row) => editIdentity(row.editUrl)?.id === payload.id);
+        if (saved && shiftFingerprint(saved) === shiftFingerprint({ ...expected, data: expected.newDate })) {
+          plan.remaining.delete(payload.id);
+          return { ok: true, shifted: true };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      throw new Error("A edição foi enviada, mas não foi confirmada. Confira as datas; a aula não será editada novamente automaticamente.");
+    } catch (error) { return { ok: false, attempted, error: error.message }; }
+    finally { registrationBusy = false; }
+  };
+
   const submittedForms = new WeakMap();
   const submitClassForm = (payload = {}) => {
     if (payload.confirmedAutoSave !== true) return { ok: false, error: "O envio automático não foi autorizado para este lote." };
@@ -416,5 +515,7 @@
     registerClass,
     previewClassDeletion,
     deletePlannedClass,
+    previewClassShift,
+    applyPlannedClassShift,
   };
 })();

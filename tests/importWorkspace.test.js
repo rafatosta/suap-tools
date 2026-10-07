@@ -19,7 +19,7 @@ test("file selection stays in the same-page panel, outside the transient popup",
   try {
     const workspace = renderToStaticMarkup(createElement(App));
     assert.match(workspace, /type="file"/);
-    assert.match(workspace, /Importação no diário atual/);
+    assert.match(workspace, /Aulas no diário atual/);
     assert.doesNotMatch(workspace, /Diagnóstico de aulas/);
     assert.doesNotMatch(workspace, /Preencher diálogo aberto/);
     // Check the popup component directly because the default App opens Notas.

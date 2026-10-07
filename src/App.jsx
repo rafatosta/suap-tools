@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import ClassesShift from "./components/ClassesShift";
 import ClassesDelete from "./components/ClassesDelete";
 import ClassesImport from "./components/ClassesImport";
 import { downloadCsv } from "./services/csvExporter";
@@ -117,12 +118,12 @@ function App() {
     [classesData]
   );
 
-  const openDeletionPanel = async () => {
+  const openOperationsPanel = async (section) => {
     setError("");
     try {
       const tab = await getActiveTab();
-      const result = await chrome.tabs.sendMessage(tab.id, { type: "SUAP_TOOLS_OPEN_IMPORT_PANEL", tabId: tab.id, section: "delete" });
-      if (!result?.ok) throw new Error(result?.error || "Não foi possível abrir as opções de exclusão.");
+      const result = await chrome.tabs.sendMessage(tab.id, { type: "SUAP_TOOLS_OPEN_IMPORT_PANEL", tabId: tab.id, section });
+      if (!result?.ok) throw new Error(result?.error || "Não foi possível abrir o painel de aulas.");
     } catch (err) { setError(err.message); }
   };
 
@@ -132,10 +133,11 @@ function App() {
   if (importWorkspace) {
     return <main className="app import-workspace">
       <header className="header">
-        <div><h1>SUAP Tools · Aulas</h1><p>Importação no diário atual</p></div>
+        <div><h1>SUAP Tools · Aulas</h1><p>Aulas no diário atual</p></div>
         <button className="secondary" disabled={importRunning} onClick={() => chrome.tabs.sendMessage(targetTabId, { type: "SUAP_TOOLS_CLOSE_IMPORT_PANEL" })}>Fechar</button>
       </header>
       <ClassesImport workspace targetTabId={targetTabId} onRunningChange={setImportRunning} externalBusy={importRunning} />
+      <ClassesShift targetTabId={targetTabId} onRunningChange={setImportRunning} busy={importRunning} initiallyOpen={new URLSearchParams(window.location.search).get("section") === "shift"} />
       <ClassesDelete targetTabId={targetTabId} onRunningChange={setImportRunning} busy={importRunning} initiallyOpen={new URLSearchParams(window.location.search).get("section") === "delete"} />
       <footer>Os dados são descartados ao fechar este painel ou recarregar a página. O envio automático depende da opção escolhida antes de iniciar o lote.</footer>
     </main>;
@@ -146,7 +148,7 @@ function App() {
       <header className="header">
         <div>
           <h1>SUAP Tools</h1>
-          <p>v0.6.1 · notas e aulas</p>
+          <p>v0.7.0 · notas e aulas</p>
         </div>
         <span className="readonly-badge">SAFE MODE</span>
       </header>
@@ -271,7 +273,8 @@ function App() {
       {activeTool === "aulas" && (
         <>
           <ClassesImport />
-          <button className="secondary delete-launcher" onClick={openDeletionPanel}>Excluir aulas da unidade...</button>
+          <button className="secondary delete-launcher" onClick={() => openOperationsPanel("shift")}>Deslocar datas das aulas...</button>
+          <button className="secondary delete-launcher" onClick={() => openOperationsPanel("delete")}>Excluir aulas da unidade...</button>
           <details className="card diagnostic-details">
             <summary>
               <span>Diagnóstico</span>

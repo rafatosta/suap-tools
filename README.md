@@ -97,3 +97,31 @@ executar simultaneamente pelo painel.
 enviada pode concluir. A extensão não desfaz exclusões. Depois de concluir ou
 interromper, confira o diário e prepare uma nova prévia para os registros
 restantes. A prévia expira em dez minutos.
+
+## Deslocamento de datas — v0.7
+
+1. Selecione o diário e a unidade no SUAP.
+2. Abra SUAP Tools → Aulas → **Deslocar datas das aulas...**.
+3. Informe a **Data inicial** em dd/mm/aaaa e o **Deslocamento em dias**
+   (padrão: 7; positivo adia, negativo antecipa).
+4. Clique em **Mostrar prévia** e confira cada data atual e nova data.
+5. Marque a confirmação e clique em **Aplicar deslocamento**.
+
+A data inicial é inclusiva. Exemplo: Unidade 2, data inicial 01/10/2026,
+deslocamento +7: 01/10 vira 08/10, 08/10 vira 15/10 e assim por diante.
+As aulas anteriores a 01/10 permanecem sem alterações.
+
+É edição dos registros existentes, preservando seus identificadores. Somente
+o campo Data é alterado; quantidade, conteúdo, professor, formato e demais
+campos do formulário original são preservados. Não cria nem exclui aulas.
+A extensão consulta o diário para confirmar cada alteração.
+
+Datas posteriores são processadas primeiro ao adiar; anteriores primeiro ao
+antecipar. Um destino que coincide com uma aula fora do intervalo selecionado
+bloqueia a prévia. Aulas modificadas depois da prévia, mudança de diário ou
+unidade e erros do SUAP interrompem a execução sem repetir o envio. A prévia
+expira em dez minutos.
+
+**Parar após a edição atual** impede as próximas alterações. Em uma execução
+parcial, confira as datas antes de preparar outra prévia para evitar deslocar
+novamente aulas já alteradas.
