@@ -286,19 +286,23 @@
     if (expectedUnit && getCurrentUnit(doc).value !== expectedUnit) throw new Error("A consulta retornou outra unidade ou não identificou a unidade. A exclusão foi interrompida.");
     return readClassList(doc);
   };
-  const previewClassDeletion = async () => {
+  const previewClassDeletion = async (payload = {}) => {
     const unit = getCurrentUnit().value;
     if (!["1", "2", "3"].includes(unit)) return { ok: false, error: "Selecione a unidade no diário antes de preparar a exclusão." };
     try {
       const diaryUrl = location.href;
       const doc = await readDeletionPage(diaryUrl);
-      const rows = deletionRows(doc, unit).filter((row) => deleteUnit(row.unidade) === unit);
+      const mode = payload.mode ?? "all";
+      if (!["all", "from-date"].includes(mode)) throw new Error("Escolha excluir toda a unidade ou a partir de uma data.");
+      const start = mode === "from-date" ? parseShiftDate(payload.startDate) : null;
+      const unitRows = deletionRows(doc, unit).filter((row) => deleteUnit(row.unidade) === unit);
+      const rows = start ? unitRows.filter((row) => parseShiftDate(row.data) >= start) : unitRows;
       if (rows.some((row) => !deleteId(row.deleteUrl))) throw new Error("Há aulas sem permissão de exclusão. Confira as permissões no SUAP.");
       for (const [id, plan] of deletionPlans) if (plan.expires < Date.now()) deletionPlans.delete(id);
       const id = crypto.randomUUID();
-      const plan = { diaryUrl, unit, rows, expires: Date.now() + 10 * 60 * 1000, remaining: new Set(rows.map((row) => deleteId(row.deleteUrl))) };
+      const plan = { diaryUrl, unit, rows, mode, startDate: start ? payload.startDate : "", expires: Date.now() + 10 * 60 * 1000, remaining: new Set(rows.map((row) => deleteId(row.deleteUrl))) };
       deletionPlans.set(id, plan);
-      return { ok: true, planId: id, diaryUrl, title: document.title, unit,
+      return { ok: true, planId: id, diaryUrl, title: document.title, unit, mode, startDate: plan.startDate, preservedCount: unitRows.length - rows.length,
         rows: rows.map((row) => ({ id: deleteId(row.deleteUrl), data: row.data, quantidade: row.quantidade, conteudo: row.conteudo })),
         totalQuantity: rows.reduce((sum, row) => sum + Number(row.quantidade), 0) };
     } catch (error) { return { ok: false, error: error.message }; }

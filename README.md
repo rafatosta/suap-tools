@@ -125,3 +125,14 @@ expira em dez minutos.
 **Parar após a edição atual** impede as próximas alterações. Em uma execução
 parcial, confira as datas antes de preparar outra prévia para evitar deslocar
 novamente aulas já alteradas.
+
+## Exclusão a partir da vigência — v0.8
+
+Em **Excluir aulas da unidade**, escolha **Toda a unidade** ou **A partir de
+uma data de vigência**. No segundo modo, informe dd/mm/aaaa e prepare a prévia.
+Somente as aulas da unidade atual com data igual ou posterior à vigência serão
+listadas para exclusão. As anteriores e as de outras unidades são preservadas.
+
+Confira os registros, informe a senha e marque a confirmação. A data e o modo
+ficam vinculados à prévia; alterá-los descarta a prévia e a confirmação. Após
+a exclusão, importe uma nova planilha com o horário desejado.

@@ -7,11 +7,11 @@ const source = await readFile(new URL('../public/suap-class-parser.js', import.m
 const url = 'https://suap.ifba.edu.br/edu/meu_diario/42/1/?tab=aulas';
 const initialRows = [{ id: '11', unit: '1' }, { id: '12', unit: '1' }, { id: '21', unit: '2' }];
 function html(rows) {
-  return `<title>Diário de teste</title><div class="action-bar search-and-filters"><select name="etapa"><option value="1">Unidade 1</option><option value="2">Unidade 2</option></select></div><table id="table_registro_aula"><tbody>${rows.map((row) => `<tr><td><a href="/comum/excluir/edu/aula/${row.id}/">Remover</a></td><td>Unidade ${row.unit}</td><td>2</td><td>07/10/2026</td><td>Professor</td><td>${row.content || 'Aula ' + row.id}</td></tr>`).join('')}</tbody></table>`;
+  return `<title>Diário de teste</title><div class="action-bar search-and-filters"><select name="etapa"><option value="1">Unidade 1</option><option value="2">Unidade 2</option></select></div><table id="table_registro_aula"><tbody>${rows.map((row) => `<tr><td><a href="/comum/excluir/edu/aula/${row.id}/">Remover</a></td><td>Unidade ${row.unit}</td><td>2</td><td>${row.date || "07/10/2026"}</td><td>Professor</td><td>${row.content || 'Aula ' + row.id}</td></tr>`).join('')}</tbody></table>`;
 }
-function setup({ wrongPassword = false, missingToken = false, loseResponse = false } = {}) {
-  const dom = new JSDOM(html(initialRows), { url, runScripts: 'outside-only' });
-  let rows = initialRows.map((row) => ({ ...row }));
+function setup({ wrongPassword = false, missingToken = false, loseResponse = false, customRows = initialRows } = {}) {
+  const dom = new JSDOM(html(customRows), { url, runScripts: 'outside-only' });
+  let rows = customRows.map((row) => ({ ...row }));
   const calls = [];
   dom.window.fetch = async (target, options) => {
     calls.push({ target, ...options });
@@ -108,5 +108,33 @@ test('already confirmed deletion is not submitted again', async () => {
   assert.equal((await state.api.deletePlannedClass(payload())).ok, true);
   assert.equal((await state.api.deletePlannedClass(payload())).ok, false);
   assert.equal(state.calls.filter((call) => call.method === 'POST').length, 1);
+  state.dom.window.close();
+});
+
+test('date-scoped deletion includes the effective date and preserves earlier classes and other units', async () => {
+  const state = setup({ customRows: [
+    { id: '11', unit: '1', date: '24/09/2026' },
+    { id: '12', unit: '1', date: '01/10/2026' },
+    { id: '13', unit: '1', date: '08/10/2026' },
+    { id: '21', unit: '2', date: '08/10/2026' },
+  ] });
+  const plan = await state.api.previewClassDeletion({ mode: 'from-date', startDate: '01/10/2026' });
+  assert.equal(plan.ok, true);
+  assert.equal(plan.rows.map((row) => row.id).join(','), '12,13');
+  assert.equal(plan.totalQuantity, 4);
+  assert.equal(plan.preservedCount, 1);
+  assert.equal((await state.api.deletePlannedClass({ planId: plan.planId, id: '11', confirmed: true, password: 'test-only-password' })).ok, false);
+  for (const row of plan.rows) assert.equal((await state.api.deletePlannedClass({ planId: plan.planId, id: row.id, confirmed: true, password: 'test-only-password' })).deleted, true);
+  assert.deepEqual(state.rows().map((row) => row.id), ['11', '21']);
+  state.dom.window.close();
+});
+test('date-scoped deletion rejects missing or invalid dates, and returns empty preview after the last class', async () => {
+  const state = setup();
+  for (const startDate of ['', '31/02/2026', '2026-10-01']) assert.equal((await state.api.previewClassDeletion({ mode: 'from-date', startDate })).ok, false);
+  const plan = await state.api.previewClassDeletion({ mode: 'from-date', startDate: '01/01/2027' });
+  assert.equal(plan.ok, true);
+  assert.equal(plan.rows.length, 0);
+  assert.equal(plan.preservedCount, 2);
+  assert.equal(state.calls.filter((call) => call.method === 'POST').length, 0);
   state.dom.window.close();
 });

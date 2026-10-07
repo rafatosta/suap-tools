@@ -17,7 +17,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message?.type === "SUAP_TOOLS_PREVIEW_CLASS_DELETION" || message?.type === "SUAP_TOOLS_DELETE_PLANNED_CLASS") {
       const parser = globalThis.SuapClassParser;
-      const operation = message.type === "SUAP_TOOLS_PREVIEW_CLASS_DELETION" ? parser.previewClassDeletion() : parser.deletePlannedClass(message.payload ?? {});
+      const operation = message.type === "SUAP_TOOLS_PREVIEW_CLASS_DELETION" ? parser.previewClassDeletion(message.payload ?? {}) : parser.deletePlannedClass(message.payload ?? {});
       operation.then(sendResponse, () => sendResponse({ ok: false, error: "Não foi possível confirmar a operação. Confira o diário." }));
       return true;
     }
