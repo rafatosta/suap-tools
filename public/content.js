@@ -6,7 +6,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const panel = document.createElement("iframe");
       panel.id = "suap-tools-import-panel";
       panel.title = "Importar aulas — SUAP Tools";
-      panel.src = chrome.runtime.getURL("index.html?view=class-import&targetTab=" + message.tabId);
+      panel.src = chrome.runtime.getURL("index.html?view=class-import&targetTab=" + message.tabId + (message.section === "delete" ? "&section=delete" : ""));
       panel.style.cssText = "position:fixed;inset:12px 12px 12px auto;width:min(960px,95vw);height:calc(100vh - 24px);z-index:2147483647;border:1px solid #d0d5dd;border-radius:12px;background:white;box-shadow:0 10px 40px #0004";
       document.body.append(panel);
       sendResponse({ ok: true }); return;
@@ -14,6 +14,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "SUAP_TOOLS_CLOSE_IMPORT_PANEL") {
       document.getElementById("suap-tools-import-panel")?.remove();
       sendResponse({ ok: true }); return;
+    }
+    if (message?.type === "SUAP_TOOLS_PREVIEW_CLASS_DELETION" || message?.type === "SUAP_TOOLS_DELETE_PLANNED_CLASS") {
+      const parser = globalThis.SuapClassParser;
+      const operation = message.type === "SUAP_TOOLS_PREVIEW_CLASS_DELETION" ? parser.previewClassDeletion() : parser.deletePlannedClass(message.payload ?? {});
+      operation.then(sendResponse, () => sendResponse({ ok: false, error: "Não foi possível confirmar a operação. Confira o diário." }));
+      return true;
     }
     if (message?.type === "SUAP_TOOLS_REGISTER_CLASS") {
       globalThis.SuapClassParser.registerClass(message.payload ?? {})

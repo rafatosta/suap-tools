@@ -325,3 +325,10 @@ footer {
 .diagnostic-chevron { flex-shrink: 0; transition: transform 150ms ease; }
 .diagnostic-details[open] .diagnostic-chevron { transform: rotate(180deg); }
 .diagnostic-content { padding-top: 14px; }
+
+.delete-launcher { margin-bottom: 12px; }
+.deletion-card { border-color: #fecdca; }
+.danger { background: #b42318; color: #fff; border: 0; border-radius: 8px; padding: 9px 12px; cursor: pointer; }
+.danger:disabled { opacity: 0.5; cursor: default; }
+.password-label { display: grid; gap: 5px; font-size: 13px; margin: 12px 0; }
+.password-label input { max-width: 320px; padding: 8px; border: 1px solid #d0d5dd; border-radius: 8px; }

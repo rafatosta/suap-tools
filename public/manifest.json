@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SUAP Tools",
-  "version": "0.5.1",
-  "description": "Ferramentas para o SUAP. Leitura de notas e aulas, importação padronizada e envio automático opcional de aulas.",
+  "version": "0.6.0",
+  "description": "Ferramentas para o SUAP. Importação de aulas e exclusão da unidade com prévia, senha e confirmação.",
   "permissions": [
     "activeTab"
   ],

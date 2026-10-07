@@ -1,7 +1,7 @@
 # SUAP Tools
 
 Extensão React/Vite Manifest V3 para tarefas no SUAP IFBA, usando a sessão
-já autenticada no navegador. Não altera notas nem exclui aulas.
+já autenticada no navegador. Não altera notas. Exclusão de aulas exige prévia, senha e confirmação explícita.
 
 ## Importar e cadastrar aulas — v0.5
 
@@ -72,3 +72,28 @@ CSV. Também lista e exporta aulas registradas. Essas operações são de leitur
 O build fica em `dist/`. Em `chrome://extensions`, ative Modo do desenvolvedor
 e use **Carregar sem compactação** para selecionar `dist/`. Em uma atualização,
 recarregue a extensão e também a página do SUAP.
+
+## Excluir todas as aulas de uma unidade — v0.6
+
+1. No SUAP, selecione o diário e a unidade desejada.
+2. Abra SUAP Tools → Aulas → **Excluir aulas da unidade...**.
+3. No painel da própria página, clique em **Preparar exclusão**.
+4. Confira o diário, a unidade, a lista e a quantidade de registros afetados.
+5. Informe sua senha do SUAP e marque a confirmação de exclusão desta unidade.
+6. Clique em **Excluir todas as aulas da Unidade N**.
+
+O lote remove somente os registros listados na prévia confirmada, usando o
+formulário `excluirregistro_form` e o campo `senha` do SUAP. O token CSRF é
+obtido novamente para cada aula. A senha não é armazenada em arquivos, logs,
+localStorage ou armazenamento da extensão; o campo é limpo ao iniciar e ao
+terminar a execução. Ela é enviada somente ao endpoint de exclusão do SUAP.
+
+Cada remoção é confirmada pela consulta do diário antes de avançar. Alteração
+do registro, mudança de diário/unidade, senha recusada ou resposta incerta
+interrompem o lote sem repetição automática. Cadastros e exclusões não podem
+executar simultaneamente pelo painel.
+
+**Parar após a exclusão atual** impede as próximas remoções; uma exclusão já
+enviada pode concluir. A extensão não desfaz exclusões. Depois de concluir ou
+interromper, confira o diário e prepare uma nova prévia para os registros
+restantes. A prévia expira em dez minutos.

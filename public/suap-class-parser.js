@@ -5,9 +5,9 @@
       .replace(/\s+/g, " ")
       .trim();
 
-  const getCurrentUnit = () => {
+  const getCurrentUnit = (root = document) => {
     // Read the diary filter, never a select inserted by the Add Class dialog.
-    const selects = Array.from(document.querySelectorAll('.action-bar.search-and-filters select'))
+    const selects = Array.from(root.querySelectorAll('.action-bar.search-and-filters select'))
       .filter((select) => !select.closest('#aula_form, [role="dialog"], .modal'));
     for (const select of selects) {
       const option = select.options[select.selectedIndex];
@@ -18,7 +18,7 @@
         return { value: String(option.value), label, source: "page" };
       }
     }
-    const titles = Array.from(document.querySelectorAll('.box > h3'))
+    const titles = Array.from(root.querySelectorAll('.box > h3'))
       .filter((title) => !title.closest('#aula_form, [role="dialog"], .modal'));
     for (const title of titles) {
       const match = cleanText(title.textContent).match(/Unidade\s+([123])(?:\D|$)/i);
@@ -257,6 +257,103 @@
     } finally { registrationBusy = false; }
   };
 
+  const deletionPlans = new Map();
+  const deleteId = (url) => {
+    try {
+      const parsed = new URL(url, location.href);
+      return parsed.origin === location.origin ? parsed.pathname.match(/^\/comum\/excluir\/edu\/aula\/(\d+)\/$/)?.[1] || "" : "";
+    } catch { return ""; }
+  };
+  const deleteUnit = (value) => cleanText(value).replace(/^Unidade\s+/i, "");
+  const deleteFingerprint = (row) => JSON.stringify([deleteId(row.deleteUrl), deleteUnit(row.unidade), row.data, Number(row.quantidade), cleanText(row.conteudo)]);
+  const readDeletionPage = async (url) => {
+    const response = await fetch(url, { credentials: "same-origin", cache: "no-store", redirect: "error" });
+    if (!response.ok) throw new Error("Não foi possível consultar a exclusão no SUAP. Confira sua sessão.");
+    const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+    if (doc.querySelector('input[name="password"]')) throw new Error("Sua sessão expirou. Entre novamente no SUAP.");
+    return doc;
+  };
+  const deletionRows = (doc, expectedUnit) => {
+    if (expectedUnit && getCurrentUnit(doc).value !== expectedUnit) throw new Error("A consulta retornou outra unidade ou não identificou a unidade. A exclusão foi interrompida.");
+    if (!doc.querySelector("#table_registro_aula")) throw new Error("Não foi possível consultar a lista de aulas. Abra Registro de Aulas no diário.");
+    return parseClasses(doc);
+  };
+  const previewClassDeletion = async () => {
+    const unit = getCurrentUnit().value;
+    if (!["1", "2", "3"].includes(unit)) return { ok: false, error: "Selecione a unidade no diário antes de preparar a exclusão." };
+    try {
+      const diaryUrl = location.href;
+      const doc = await readDeletionPage(diaryUrl);
+      const rows = deletionRows(doc, unit).filter((row) => deleteUnit(row.unidade) === unit);
+      if (rows.some((row) => !deleteId(row.deleteUrl))) throw new Error("Há aulas sem permissão de exclusão. Confira as permissões no SUAP.");
+      for (const [id, plan] of deletionPlans) if (plan.expires < Date.now()) deletionPlans.delete(id);
+      const id = crypto.randomUUID();
+      const plan = { diaryUrl, unit, rows, expires: Date.now() + 10 * 60 * 1000, remaining: new Set(rows.map((row) => deleteId(row.deleteUrl))) };
+      deletionPlans.set(id, plan);
+      return { ok: true, planId: id, diaryUrl, title: document.title, unit,
+        rows: rows.map((row) => ({ id: deleteId(row.deleteUrl), data: row.data, quantidade: row.quantidade, conteudo: row.conteudo })),
+        totalQuantity: rows.reduce((sum, row) => sum + Number(row.quantidade), 0) };
+    } catch (error) { return { ok: false, error: error.message }; }
+  };
+  const deletePlannedClass = async (payload = {}) => {
+    let secret = payload.password;
+    payload.password = "";
+    const plan = deletionPlans.get(payload.planId);
+    if (payload.confirmed !== true || !plan || plan.expires < Date.now()) return { ok: false, attempted: false, error: "Atualize a prévia e confirme a exclusão desta unidade." };
+    if (typeof secret !== "string" || !secret.length) return { ok: false, attempted: false, error: "Informe sua senha do SUAP." };
+    if (registrationBusy) return { ok: false, attempted: false, error: "Outra operação está em andamento. Aguarde." };
+    const expected = plan.rows.find((row) => deleteId(row.deleteUrl) === payload.id);
+    if (!expected || !plan.remaining.has(payload.id)) return { ok: false, attempted: false, error: "A aula não pertence à prévia confirmada ou já foi excluída." };
+    registrationBusy = true;
+    let attempted = false;
+    try {
+      if (location.href !== plan.diaryUrl || getCurrentUnit().value !== plan.unit) throw new Error("O diário ou a unidade mudou. A exclusão foi interrompida.");
+      const rows = deletionRows(await readDeletionPage(plan.diaryUrl), plan.unit);
+      const current = rows.find((row) => deleteId(row.deleteUrl) === payload.id);
+      if (!current || deleteFingerprint(current) !== deleteFingerprint(expected)) throw new Error("A aula mudou desde a prévia. Atualize a lista antes de excluir.");
+      const url = new URL(expected.deleteUrl, plan.diaryUrl);
+      const doc = await readDeletionPage(url.href);
+      const form = doc.querySelector("#excluirregistro_form");
+      if (!form || form.method.toLowerCase() !== "post" || !form.querySelector('input[type="password"][name="senha"]')) throw new Error("O SUAP não disponibilizou a confirmação de exclusão esperada.");
+      const action = new URL(form.getAttribute("action") || url.href, url.href);
+      if (deleteId(action.href) !== payload.id) throw new Error("Destino de exclusão inválido.");
+      const body = new URLSearchParams();
+      for (const field of form.querySelectorAll("input, select, textarea")) {
+        if (!field.name || field.disabled || ["password", "submit", "button", "file", "reset"].includes(field.type) || (["checkbox", "radio"].includes(field.type) && !field.checked)) continue;
+        body.append(field.name, field.value);
+      }
+      if (!body.get("csrfmiddlewaretoken")) throw new Error("A autorização da exclusão não foi informada pelo SUAP.");
+      body.set("senha", secret);
+      const submit = form.querySelector('input[type="submit"][name="excluirregistro_form"]');
+      if (submit) body.set(submit.name, submit.value);
+      if (location.href !== plan.diaryUrl || getCurrentUnit().value !== plan.unit) throw new Error("O diário ou a unidade mudou antes da exclusão.");
+      attempted = true;
+      // Do not follow redirects with a body containing the password.
+      const response = await fetch(action.href, { method: "POST", body, credentials: "same-origin", cache: "no-store", redirect: "manual" });
+      if (response.type !== "opaqueredirect") {
+        if (!response.ok) throw new Error("O SUAP recusou a exclusão. Confira sua sessão e sua senha.");
+        const result = new DOMParser().parseFromString(await response.text(), "text/html");
+        const errors = Array.from(result.querySelectorAll(".errorlist, .errornote, .msg.error")).map((element) => cleanText(element.textContent)).filter(Boolean);
+        if (errors.length) throw new Error(errors.join(" "));
+        if (result.querySelector("#excluirregistro_form")) throw new Error("A exclusão não foi aceita. Confira sua senha no SUAP.");
+      }
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const updated = deletionRows(await readDeletionPage(plan.diaryUrl), plan.unit);
+        if (!updated.some((row) => deleteId(row.deleteUrl) === payload.id)) {
+          plan.remaining.delete(payload.id);
+          return { ok: true, deleted: true };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      throw new Error("A exclusão foi enviada, mas não foi confirmada. Confira o diário; não haverá nova tentativa automática.");
+    } catch (error) {
+      return { ok: false, attempted, error: String(error.message).split(secret).join("[senha ocultada]") };
+    } finally {
+      secret = "";
+      registrationBusy = false;
+    }
+  };
+
   const submittedForms = new WeakMap();
   const submitClassForm = (payload = {}) => {
     if (payload.confirmedAutoSave !== true) return { ok: false, error: "O envio automático não foi autorizado para este lote." };
@@ -309,5 +406,7 @@
     openClassForm,
     submitClassForm,
     registerClass,
+    previewClassDeletion,
+    deletePlannedClass,
   };
 })();

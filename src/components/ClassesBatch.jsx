@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function ClassesBatch({ rows, targetTabId, onRunningChange }) {
+export default function ClassesBatch({ rows, targetTabId, onRunningChange, externalBusy = false }) {
   const stop = useRef(false);
   useEffect(() => () => { stop.current = true; }, []);
   const [autoSave, setAutoSave] = useState(false);
@@ -15,7 +15,7 @@ export default function ClassesBatch({ rows, targetTabId, onRunningChange }) {
       .then((result) => setDiary(result?.metadata ?? null)).catch((err) => setError(err.message));
   }, [targetTabId]);
   async function register() {
-    if (running || uncertain) return;
+    if (running || uncertain || externalBusy) return;
     stop.current = false;
     setRunning(true); onRunningChange(true); setError("");
     let current = savedCount;
@@ -44,13 +44,13 @@ export default function ClassesBatch({ rows, targetTabId, onRunningChange }) {
     <h3>Cadastrar no diário atual</h3>
     <p className="muted form-help">{diary?.title} · {diary?.unit?.label || "Abra Registro de Aulas no diário desejado"}</p>
     <label className="auto-save-option">
-      <input type="checkbox" checked={autoSave} onChange={(event) => setAutoSave(event.target.checked)} disabled={running} />
+      <input type="checkbox" checked={autoSave} onChange={(event) => setAutoSave(event.target.checked)} disabled={running || externalBusy} />
       Enviar e salvar automaticamente todas as aulas deste lote
     </label>
     <p className="muted form-help">{autoSave ? "Ao iniciar, todas as aulas serão cadastradas em sequência, com confirmação de cada registro." : "Desmarcado: você confirma o cadastro de uma aula por vez aqui no painel."}</p>
     {duplicate && <div className="error">Há aulas repetidas no arquivo. Remova as duplicações antes de cadastrar.</div>}
     {wrongUnit && <div className="error">As aulas devem pertencer à unidade selecionada no diário atual.</div>}
-    <button className="primary" onClick={register} disabled={running || invalid || !diary?.url || !rows.length || savedCount === rows.length || uncertain}>
+    <button className="primary" onClick={register} disabled={running || externalBusy || invalid || !diary?.url || !rows.length || savedCount === rows.length || uncertain}>
       {running ? "Cadastrando..." : autoSave ? "Cadastrar todas as aulas" : "Cadastrar próxima aula"}
     </button>
     {running && <button className="secondary" onClick={() => { stop.current = true; }}>Parar após a aula atual</button>}

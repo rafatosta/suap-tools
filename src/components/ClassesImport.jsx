@@ -2,7 +2,7 @@ import ClassesBatch from "./ClassesBatch";
 import { useState } from "react";
 import { downloadClassesTemplate, importClassesFile } from "../services/classesImport";
 
-export default function ClassesImport({ workspace = false, targetTabId, onRunningChange = () => {} }) {
+export default function ClassesImport({ workspace = false, targetTabId, onRunningChange = () => {}, externalBusy = false }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,7 +42,7 @@ export default function ClassesImport({ workspace = false, targetTabId, onRunnin
     <div className="button-row">
       <button className="secondary" onClick={downloadClassesTemplate}>Baixar modelo CSV</button>
       {workspace ? <label className="import-label">Importar CSV/XLSX
-        <input type="file" accept=".csv,.xlsx" onChange={importFile} disabled={busy || batchRunning} />
+        <input type="file" accept=".csv,.xlsx" onChange={importFile} disabled={busy || batchRunning || externalBusy} />
       </label> : <button className="primary" onClick={openWorkspace}>Importar aulas nesta página</button>}
     </div>
     {!workspace && <p className="muted import-safety">A importação aparece nesta página do SUAP, sem abrir outra aba.</p>}
@@ -60,7 +60,7 @@ export default function ClassesImport({ workspace = false, targetTabId, onRunnin
       </>}
     </div>
     {workspace && result && !result.columnErrors.length && result.rows.length > 0 &&
-      <ClassesBatch key={filename + JSON.stringify(result.rows)} rows={result.rows} targetTabId={targetTabId} onRunningChange={(running) => { setBatchRunning(running); onRunningChange(running); }} />}
+      <ClassesBatch key={filename + JSON.stringify(result.rows)} rows={result.rows} targetTabId={targetTabId} externalBusy={externalBusy} onRunningChange={(running) => { setBatchRunning(running); onRunningChange(running); }} />}
     <p className="muted import-safety">A seleção do arquivo apenas valida e mostra a prévia. O cadastro começa quando você confirma o envio; o salvamento só é automático se você marcar a opção de envio do lote.</p>
   </section>;
 }
