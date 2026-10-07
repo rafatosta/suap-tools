@@ -1,3 +1,4 @@
+import ClassesBatch from "./ClassesBatch";
 import { useState } from "react";
 import { downloadClassesTemplate, importClassesFile } from "../services/classesImport";
 
@@ -5,6 +6,7 @@ export default function ClassesImport({ workspace = false }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
   const [filename, setFilename] = useState("");
   async function importFile(event) {
     const file = event.target.files?.[0];
@@ -29,13 +31,13 @@ export default function ClassesImport({ workspace = false }) {
   const valid = result?.rows.filter((row) => !row.errors.length) ?? [];
   const invalid = result?.rows.filter((row) => row.errors.length) ?? [];
   return <section className="card import-card">
-    <h2>Importar aulas · simulação</h2>
+    <h2>Importar aulas · prévia e preenchimento</h2>
     <p className="muted form-help">Use os cabeçalhos exatos Unidade, Data, Quantidade, Conteúdo e, opcionalmente, Formato. CSV separado por ponto e vírgula ou vírgula; XLSX com uma única aba. A ordem das colunas pode variar.</p>
     <p className="muted form-help">Unidade: 1, 2 ou 3. Data: dd/mm/aaaa (texto no XLSX). Quantidade: inteiro positivo. Conteúdo: obrigatório. Formato: vazio, Síncrona ou Assíncrona. O CSV de exportação das aulas registradas tem outro formato; use este modelo.</p>
     <div className="button-row">
       <button className="secondary" onClick={downloadClassesTemplate}>Baixar modelo CSV</button>
       {workspace ? <label className="import-label">Importar CSV/XLSX
-        <input type="file" accept=".csv,.xlsx" onChange={importFile} disabled={busy} />
+        <input type="file" accept=".csv,.xlsx" onChange={importFile} disabled={busy || batchRunning} />
       </label> : <button className="primary" onClick={openWorkspace}>Abrir importação em uma aba</button>}
     </div>
     {!workspace && <p className="muted import-safety">Selecione o arquivo na aba de importação. Ela permanece aberta para mostrar a prévia e os erros.</p>}
@@ -52,6 +54,8 @@ export default function ClassesImport({ workspace = false }) {
         {!!valid.length && <><h3>Prévia das linhas válidas</h3><div className="table-wrap"><table><thead><tr><th>Linha</th><th>Unidade</th><th>Data</th><th>Qtd.</th><th>Conteúdo</th><th>Formato</th></tr></thead><tbody>{valid.map((row) => <tr key={row.line}><td>{row.line}</td><td>{row.unidade}</td><td>{row.data}</td><td>{row.quantidade}</td><td>{row.conteudo}</td><td>{row.formato || "Não informado"}</td></tr>)}</tbody></table></div></>}
       </>}
     </div>
-    <p className="muted import-safety">Somente validação e prévia local. Nenhum formulário é preenchido e nenhuma aula é salva por esta importação.</p>
+    {workspace && result && !result.columnErrors.length && result.rows.length > 0 &&
+      <ClassesBatch key={filename + JSON.stringify(result.rows)} rows={result.rows} onRunningChange={setBatchRunning} />}
+    <p className="muted import-safety">A seleção do arquivo apenas valida e mostra a prévia. O preenchimento começa quando você inicia o lote; o salvamento é manual no SUAP.</p>
   </section>;
 }

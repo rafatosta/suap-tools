@@ -97,8 +97,8 @@ O build será criado em `dist/`.
 Na aba **Aulas**, clique em **Baixar modelo CSV**, preencha os registros e use
 **Abrir importação em uma aba**. Na nova aba, selecione o arquivo em
 **Importar CSV/XLSX**. A seleção ocorre fora do popup para que a perda de foco
-não feche a interface nem descarte a prévia. Esta operação apenas valida e simula localmente; não abre
-nem preenche formulários, não envia mensagens à página e não salva aulas.
+não feche a interface nem descarte a prévia. A seleção do arquivo apenas valida e simula localmente. O preenchimento só
+começa ao iniciar o lote; a extensão nunca salva aulas automaticamente.
 
 | Coluna | Regra |
 | --- | --- |
@@ -123,3 +123,27 @@ e importe novamente. Os dados importados permanecem apenas na memória da aba de
 e são descartados ao recarregar ou fechá-la.
 
 Validação automatizada: `npm test`. Build da extensão: `npm run build`.
+
+## Preenchimento automático das aulas importadas
+
+1. Abra Registro de Aulas no diário e selecione a unidade do arquivo.
+2. Na aba de importação, carregue o arquivo e corrija todos os erros.
+3. Clique em **Buscar abas do SUAP** e selecione o diário de destino.
+4. Clique em **Iniciar preenchimento automático**.
+5. No SUAP, revise a aula preenchida e clique manualmente em **Salvar**.
+6. A extensão confirma o novo registro no diário e preenche a próxima aula
+   automaticamente. Repita a revisão e o salvamento até concluir o lote.
+
+Mantenha a aba de importação aberta durante o lote. O destino fica vinculado à
+aba escolhida, independentemente de qual aba estiver ativa. Formulários com
+conteúdo, aulas já registradas, duplicações no arquivo, mudança de diário ou
+unidade e incompatibilidade dos campos interrompem o preenchimento. O lote
+deve conter aulas de uma única unidade, correspondente à unidade do diário.
+O avanço exige um novo registro identificável na tabela, com os mesmos dados
+importados, e o formulário fechado; fechar ou cancelar o formulário não
+confirma salvamento.
+
+**Interromper lote** cancela apenas os próximos passos. Não fecha, salva ou
+exclui a aula atual. Confira o formulário e o diário antes de continuar. A
+contagem de aulas salvas permanece enquanto a aba estiver aberta; fechar ou
+recarregar descarta o acompanhamento. Não importe novamente aulas já salvas.

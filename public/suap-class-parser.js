@@ -142,6 +142,19 @@
       };
     }
 
+    const selectors = {
+      quantidade: "#id_quantidade", etapa: "#id_etapa", data: "#id_data",
+      formato: "#id_formato", conteudo: "#id_conteudo",
+    };
+    for (const [key, selector] of Object.entries(selectors)) {
+      if (payload[key] === undefined || payload[key] === null) continue;
+      const element = form.querySelector(selector);
+      if (!element || element.disabled || element.readOnly) return { ok: false, error: `Campo indisponível no formulário: ${key}.` };
+      if (element instanceof HTMLSelectElement && !Array.from(element.options).some((option) => option.value === String(payload[key]) && !option.disabled)) {
+        return { ok: false, error: `Valor não disponível no SUAP para ${key}.` };
+      }
+    }
+
     const applied = [];
 
     const apply = (selector, key) => {

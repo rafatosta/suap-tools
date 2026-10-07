@@ -313,3 +313,6 @@ footer {
 .import-workspace { width: min(100%, 1040px); margin: 0 auto; }
 .import-workspace .table-wrap { max-height: 65vh; }
 .import-workspace td:nth-child(5) { max-width: none; }
+
+.batch-panel { border-top: 1px solid #eaecf0; margin-top: 16px; padding-top: 12px; }
+.batch-panel select { max-width: 380px; padding: 6px; }

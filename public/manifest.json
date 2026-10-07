@@ -1,18 +1,28 @@
 {
   "manifest_version": 3,
   "name": "SUAP Tools",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Ferramentas auxiliares para o SUAP. Leitura de notas e aulas, com preenchimento assistido de aula sem envio automático.",
-  "permissions": ["activeTab"],
-  "host_permissions": ["https://suap.ifba.edu.br/*"],
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://suap.ifba.edu.br/*"
+  ],
   "action": {
     "default_title": "SUAP Tools",
     "default_popup": "index.html"
   },
   "content_scripts": [
     {
-      "matches": ["https://suap.ifba.edu.br/*"],
-      "js": ["suap-grade-parser.js", "suap-class-parser.js", "content.js"],
+      "matches": [
+        "https://suap.ifba.edu.br/*"
+      ],
+      "js": [
+        "suap-grade-parser.js",
+        "suap-class-parser.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ]
