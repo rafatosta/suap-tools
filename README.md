@@ -95,7 +95,9 @@ O build será criado em `dist/`.
 ## Importação padronizada de aulas
 
 Na aba **Aulas**, clique em **Baixar modelo CSV**, preencha os registros e use
-**Importar CSV/XLSX**. Esta operação apenas valida e simula localmente; não abre
+**Abrir importação em uma aba**. Na nova aba, selecione o arquivo em
+**Importar CSV/XLSX**. A seleção ocorre fora do popup para que a perda de foco
+não feche a interface nem descarte a prévia. Esta operação apenas valida e simula localmente; não abre
 nem preenche formulários, não envia mensagens à página e não salva aulas.
 
 | Coluna | Regra |
@@ -117,7 +119,7 @@ de importação.
 Erros de estrutura bloqueiam todo o arquivo. Erros de dados indicam a linha e
 os campos que precisam de correção. Linhas vazias são ignoradas; somente linhas
 válidas aparecem na prévia e nos totais de aulas por unidade. Corrija o arquivo
-e importe novamente. Os dados importados permanecem apenas na memória do popup
-e são descartados ao fechá-lo.
+e importe novamente. Os dados importados permanecem apenas na memória da aba de importação
+e são descartados ao recarregar ou fechá-la.
 
 Validação automatizada: `npm test`. Build da extensão: `npm run build`.

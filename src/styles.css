@@ -309,3 +309,7 @@ footer {
 .import-card td:nth-child(5) { min-width: 170px; white-space: pre-wrap; }
 .import-card ul { padding-left: 20px; margin: 8px 0; }
 .import-safety { margin-top: 12px; line-height: 1.45; }
+
+.import-workspace { width: min(100%, 1040px); margin: 0 auto; }
+.import-workspace .table-wrap { max-height: 65vh; }
+.import-workspace td:nth-child(5) { max-width: none; }
