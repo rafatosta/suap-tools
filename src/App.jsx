@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import ClassesImport from "./components/ClassesImport";
 import { downloadCsv } from "./services/csvExporter";
 import { downloadClassesCsv } from "./services/classesCsvExporter";
 
@@ -291,6 +292,7 @@ function App() {
 
       {activeTool === "aulas" && (
         <>
+          <ClassesImport />
           <section className="card">
             <h2>Diagnóstico de aulas</h2>
 

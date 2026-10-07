@@ -88,8 +88,36 @@ O build será criado em `dist/`.
 
 ## Próximos passos possíveis
 
-- importação de CSV/XLSX;
-- mapeamento de colunas;
 - simulação de lançamento de notas;
 - cadastro de aulas em lote com prévia;
 - salvamento explícito somente após confirmação do usuário.
+
+## Importação padronizada de aulas
+
+Na aba **Aulas**, clique em **Baixar modelo CSV**, preencha os registros e use
+**Importar CSV/XLSX**. Esta operação apenas valida e simula localmente; não abre
+nem preenche formulários, não envia mensagens à página e não salva aulas.
+
+| Coluna | Regra |
+| --- | --- |
+| Unidade | Obrigatória: 1, 2 ou 3 |
+| Data | Obrigatória: data real em dd/mm/aaaa |
+| Quantidade | Obrigatória: inteiro positivo |
+| Conteúdo | Obrigatória: texto não vazio |
+| Formato | Coluna opcional: vazio, Síncrona ou Assíncrona |
+
+Os cabeçalhos devem ser escritos exatamente como acima, sem colunas adicionais
+ou duplicadas. A ordem pode variar. CSV: UTF-8, separado por `;` ou `,`, com
+suporte a campos entre aspas e conteúdo multilinha. XLSX: exatamente uma aba;
+configure **Data como texto** para preservar dd/mm/aaaa. Limite: 5 MB.
+O modelo baixado contém apenas os cabeçalhos, sem exemplos para lançamento.
+O CSV de exportação das aulas registradas inclui Professor e não é um modelo
+de importação.
+
+Erros de estrutura bloqueiam todo o arquivo. Erros de dados indicam a linha e
+os campos que precisam de correção. Linhas vazias são ignoradas; somente linhas
+válidas aparecem na prévia e nos totais de aulas por unidade. Corrija o arquivo
+e importe novamente. Os dados importados permanecem apenas na memória do popup
+e são descartados ao fechá-lo.
+
+Validação automatizada: `npm test`. Build da extensão: `npm run build`.
