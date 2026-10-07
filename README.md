@@ -156,3 +156,11 @@ de URL, e a unidade é lida fora do diálogo. No lote, os valores são aplicados
 sem disparar os eventos de alteração que podem reinicializar o formulário do
 SUAP. Após a abertura e o preenchimento, a extensão aguarda e confere os campos
 antes de indicar que a aula está pronta para revisão e salvamento manual.
+
+### Confirmação de salvamento na v0.3.2
+
+Se o usuário salvar antes da conferência dos campos, o lote procura o novo
+registro no diário e confirma o salvamento, inclusive na última aula. A
+conferência tolera um breve atraso de atualização da tabela e não preenche
+novamente uma aula que acabou de ser salva. Apenas fechar o diálogo sem um
+novo registro correspondente continua sem contar como salvamento.

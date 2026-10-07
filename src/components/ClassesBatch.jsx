@@ -49,7 +49,7 @@ export default function ClassesBatch({ rows, onRunningChange }) {
     } finally { controller.current = null; setRunning(false); onRunningChange(false); }
   }
   const invalid = rows.some((row) => row.errors.length);
-  const labels = { opening: "Abrindo formulário", "waiting-save": "Preenchida: revise e clique em Salvar no SUAP", saved: "Salvamento confirmado", complete: "Todas as aulas do lote foram preenchidas e salvas manualmente" };
+  const labels = { opening: "Abrindo formulário", verifying: "Conferindo preenchimento ou salvamento", "waiting-save": "Preenchida: revise e clique em Salvar no SUAP", saved: "Salvamento confirmado", complete: "Todas as aulas do lote foram preenchidas e salvas manualmente" };
   return <section className="batch-panel">
     <h3>Preencher todas as aulas</h3>
     <p className="muted form-help">A extensão abre e preenche uma aula por vez. Você revisa e clica em Salvar no SUAP. Após confirmar o registro no diário, a próxima aula é preenchida automaticamente. Mantenha esta aba aberta e use somente o diário escolhido durante o lote.</p>

@@ -18,7 +18,8 @@ function scenario({ rows = [row, row2], existing = [], unit = "1", alreadyOpen =
   };
   const onProgress = (progress) => { events.push(progress.state); if (progress.state === "waiting-save") current = rows[progress.index]; };
   const manualSave = async () => { if (current && open) { events.push("USER_SAVED"); records.push({ ...current, editUrl: "edit/" + records.length }); open = false; current = null; } };
-  return { rows, send, signal: abort.signal, onProgress, wait: manualSave, abort, events, records };
+  return { rows, send, signal: abort.signal, onProgress, wait: manualSave, abort, events, records,
+    simulateSave: (row) => { records.push({ ...row, editUrl: "edit/" + records.length }); open = false; fields = null; current = null; } };
 }
 test("fills all rows sequentially only after each manual save, maps native format values", async () => {
   const state = scenario();
@@ -48,7 +49,7 @@ test("canceling the dialog does not advance or count as a save", async () => {
 });
 test("field mismatch stops instead of waiting for save or advancing", async () => {
   const state = scenario({ mismatch: true });
-  await assert.rejects(fillClassesBatch(state), /não correspondem/);
+  await assert.rejects(fillClassesBatch(state), /Não foi possível confirmar/);
   assert.ok(!state.events.includes("waiting-save"));
 });
 test("changing diaries while waiting stops the queue", async () => {
@@ -109,4 +110,37 @@ test("modal transitions with missing unit and changing query params do not inter
   };
   await fillClassesBatch(state);
   assert.equal(state.records.length, 2);
+});
+
+test("a quick manual save before field verification is counted, including the final class", async () => {
+  const state = scenario();
+  let current;
+  const originalProgress = state.onProgress;
+  state.onProgress = (progress) => {
+    originalProgress(progress);
+    if (progress.state === "verifying") current = progress.row;
+  };
+  state.wait = async () => {
+    if (current) { state.simulateSave(current); current = null; }
+  };
+  await fillClassesBatch(state);
+  assert.equal(state.records.length, 2);
+  assert.equal(state.events.filter((event) => event === "saved").length, 2);
+  assert.equal(state.events.at(-1), "complete");
+});
+test("a saved record that appears after a short reload is confirmed without refilling", async () => {
+  const state = scenario({ rows: [row] });
+  const originalProgress = state.onProgress;
+  const originalSend = state.send;
+  let current, reads = 0;
+  state.onProgress = (progress) => { originalProgress(progress); if (progress.state === "verifying") current = progress.row; };
+  state.wait = async () => { if (current) { state.simulateSave(current); current = null; } };
+  state.send = async (...args) => {
+    const result = await originalSend(...args);
+    if (state.records.length && args[0] === "SUAP_TOOLS_EXTRACT_CLASSES" && ++reads < 3) result.classes = [];
+    return result;
+  };
+  await fillClassesBatch(state);
+  assert.equal(state.events.filter((event) => event === "SUAP_TOOLS_FILL_CLASS_FORM").length, 1);
+  assert.equal(state.events.at(-1), "complete");
 });

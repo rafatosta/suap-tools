@@ -85,13 +85,32 @@ export async function fillClassesBatch({ rows, send, signal, onProgress, wait = 
       const filled = await request("SUAP_TOOLS_FILL_CLASS_FORM", { ...expected, mode: "batch" });
       if (!filled?.ok) throw new Error(filled?.error || "Não foi possível preencher a aula.");
     }
-    // Let modal initialization finish before confirming that the values survived.
-    await wait(1000, signal);
-    const actual = await request("SUAP_TOOLS_GET_CLASS_FORM");
-    if (!actual?.ok || Object.entries(expected).some(([field, value]) => clean(actual.fields?.[field]) !== clean(value))) throw new Error("Os campos do formulário não correspondem à aula importada. Confira o formulário; o lote foi interrompido.");
+    onProgress({ index, state: "verifying", row });
+    // Save can happen before this post-fill check. A closed/cleared form is not
+    // a field mismatch if the new class already exists in the diary.
+    const newRecord = (snapshot) => snapshot?.ok && snapshot.classes.some((item) =>
+      item.editUrl && !existingIds.has(item.editUrl) && classKey(item) === classKey(row));
+    let saved = false;
+    let verified = false;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await wait(attempt === 0 ? 1000 : 500, signal);
+      let actual;
+      let snapshot;
+      try {
+        actual = await request("SUAP_TOOLS_GET_CLASS_FORM");
+        snapshot = await request("SUAP_TOOLS_EXTRACT_CLASSES");
+      } catch (error) {
+        if (signal.aborted || attempt === 9) throw error;
+        continue; // Manual saving may briefly navigate/reload the page.
+      }
+      assertDiary(snapshot, diary, unit);
+      if (newRecord(snapshot) && !actual?.ok) { saved = true; break; }
+      if (sameForm(actual, expected)) { verified = true; break; }
+    }
+    if (saved) { onProgress({ index, state: "saved", row }); continue; }
+    if (!verified) throw new Error("Não foi possível confirmar o preenchimento ou o salvamento da aula. Confira o registro no diário antes de continuar.");
     onProgress({ index, state: "waiting-save", row });
     // Observe the actual new record, not just the disappearance of the dialog.
-    let saved = false;
     let failures = 0;
     for (let attempt = 0; attempt < 1800; attempt++) {
       await wait(1000, signal);
@@ -106,7 +125,7 @@ export async function fillClassesBatch({ rows, send, signal, onProgress, wait = 
       failures = 0;
       assertDiary(snapshot, diary, unit);
       if (!snapshot?.ok) continue;
-      const recordFound = snapshot.classes.some((item) => item.editUrl && !existingIds.has(item.editUrl) && classKey(item) === classKey(row));
+      const recordFound = newRecord(snapshot);
       if (recordFound) {
         if ((await request("SUAP_TOOLS_GET_CLASS_FORM"))?.ok) continue;
         saved = true;
