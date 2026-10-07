@@ -165,9 +165,23 @@
     };
   };
 
+  const openClassForm = () => {
+    const link = Array.from(
+      document.querySelectorAll('a[href*="/edu/adicionar_aula_diario/"]')
+    ).find((a) => cleanText(a.textContent).toLowerCase().includes("adicionar aula"));
+
+    if (!link) {
+      return { ok: false, error: "Botão 'Adicionar Aula' não encontrado nesta página." };
+    }
+
+    link.click();
+    return { ok: true, opened: true };
+  };
+
   globalThis.SuapClassParser = {
     extractClasses,
     getClassFormState,
     fillClassForm,
+    openClassForm,
   };
 })();
