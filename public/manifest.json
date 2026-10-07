@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "SUAP Tools",
+  "version": "0.1.0",
+  "description": "Ferramentas auxiliares para o SUAP. A v0.1 é somente leitura.",
+  "permissions": ["activeTab"],
+  "host_permissions": ["https://suap.ifba.edu.br/*"],
+  "action": {
+    "default_title": "SUAP Tools",
+    "default_popup": "index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://suap.ifba.edu.br/*"],
+      "js": ["suap-grade-parser.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
