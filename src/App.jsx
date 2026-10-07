@@ -35,6 +35,7 @@ function DiagnosticItem({ ok, children }) {
 }
 
 function App() {
+  const importWorkspace = new URLSearchParams(window.location.search).get("view") === "class-import";
   const [activeTool, setActiveTool] = useState("notas");
   const [gradebook, setGradebook] = useState(null);
   const [classesData, setClassesData] = useState(null);
@@ -110,11 +111,11 @@ function App() {
   };
 
   useEffect(() => {
-    loadGrades();
+    if (!importWorkspace) loadGrades();
   }, []);
 
   useEffect(() => {
-    if (activeTool === "aulas") loadClasses();
+    if (!importWorkspace && activeTool === "aulas") loadClasses();
   }, [activeTool]);
 
   const gradePreview = useMemo(
@@ -167,6 +168,17 @@ function App() {
 
   const gradeDiagnostics = gradebook?.diagnostics;
   const classDiagnostics = classesData?.diagnostics;
+
+  if (importWorkspace) {
+    return <main className="app import-workspace">
+      <header className="header">
+        <div><h1>SUAP Tools · Aulas</h1><p>Importação e prévia</p></div>
+        <span className="readonly-badge">SAFE MODE</span>
+      </header>
+      <ClassesImport workspace />
+      <footer>Mantenha esta aba aberta durante a revisão. Os dados são descartados ao recarregar ou fechar esta aba. Nenhuma aula é salva automaticamente.</footer>
+    </main>;
+  }
 
   return (
     <main className="app">

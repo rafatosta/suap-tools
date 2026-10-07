@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { downloadClassesTemplate, importClassesFile } from "../services/classesImport";
 
-export default function ClassesImport() {
+export default function ClassesImport({ workspace = false }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -18,6 +18,14 @@ export default function ClassesImport() {
     catch (err) { setError(err instanceof Error ? err.message : "Não foi possível ler o arquivo."); }
     finally { setBusy(false); }
   }
+  async function openWorkspace() {
+    setError("");
+    try {
+      await chrome.tabs.create({ url: chrome.runtime.getURL("index.html?view=class-import") });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível abrir a aba de importação.");
+    }
+  }
   const valid = result?.rows.filter((row) => !row.errors.length) ?? [];
   const invalid = result?.rows.filter((row) => row.errors.length) ?? [];
   return <section className="card import-card">
@@ -26,10 +34,11 @@ export default function ClassesImport() {
     <p className="muted form-help">Unidade: 1, 2 ou 3. Data: dd/mm/aaaa (texto no XLSX). Quantidade: inteiro positivo. Conteúdo: obrigatório. Formato: vazio, Síncrona ou Assíncrona. O CSV de exportação das aulas registradas tem outro formato; use este modelo.</p>
     <div className="button-row">
       <button className="secondary" onClick={downloadClassesTemplate}>Baixar modelo CSV</button>
-      <label className="import-label">Importar CSV/XLSX
+      {workspace ? <label className="import-label">Importar CSV/XLSX
         <input type="file" accept=".csv,.xlsx" onChange={importFile} disabled={busy} />
-      </label>
+      </label> : <button className="primary" onClick={openWorkspace}>Abrir importação em uma aba</button>}
     </div>
+    {!workspace && <p className="muted import-safety">Selecione o arquivo na aba de importação. Ela permanece aberta para mostrar a prévia e os erros.</p>}
     <div aria-live="polite">
       {busy && <p className="muted">Validando arquivo...</p>}
       {filename && <p className="import-filename">{filename}</p>}
