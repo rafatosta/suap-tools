@@ -136,7 +136,7 @@ Validação automatizada: `npm test`. Build da extensão: `npm run build`.
 
 Mantenha a aba de importação aberta durante o lote. O destino fica vinculado à
 aba escolhida, independentemente de qual aba estiver ativa. Formulários com
-conteúdo, aulas já registradas, duplicações no arquivo, mudança de diário ou
+conteúdo de outra aula, aulas já registradas, duplicações no arquivo, mudança de diário ou
 unidade e incompatibilidade dos campos interrompem o preenchimento. O lote
 deve conter aulas de uma única unidade, correspondente à unidade do diário.
 O avanço exige um novo registro identificável na tabela, com os mesmos dados
@@ -147,3 +147,12 @@ confirma salvamento.
 exclui a aula atual. Confira o formulário e o diário antes de continuar. A
 contagem de aulas salvas permanece enquanto a aba estiver aberta; fechar ou
 recarregar descarta o acompanhamento. Não importe novamente aulas já salvas.
+
+### Correção do diálogo na v0.3.1
+
+O lote ignora formulários ocultos e reaproveita um diálogo visível vazio ou já
+preenchido com a aula atual. A identificação do diário desconsidera parâmetros
+de URL, e a unidade é lida fora do diálogo. No lote, os valores são aplicados
+sem disparar os eventos de alteração que podem reinicializar o formulário do
+SUAP. Após a abertura e o preenchimento, a extensão aguarda e confere os campos
+antes de indicar que a aula está pronta para revisão e salvamento manual.

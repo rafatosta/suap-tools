@@ -26,6 +26,7 @@ export default function ClassesBatch({ rows, onRunningChange }) {
     } catch (err) { setError(err.message); }
   }
   async function start() {
+    if (controller.current && !controller.current.signal.aborted) return;
     const abort = new AbortController();
     controller.current = abort;
     setError(""); setRunning(true); onRunningChange(true);
@@ -45,7 +46,7 @@ export default function ClassesBatch({ rows, onRunningChange }) {
       });
     } catch (err) {
       setError(err.name === "AbortError" ? "Lote interrompido. Confira a aula atual no SUAP antes de continuar; o formulário permanece sob seu controle." : err.message);
-    } finally { setRunning(false); onRunningChange(false); }
+    } finally { controller.current = null; setRunning(false); onRunningChange(false); }
   }
   const invalid = rows.some((row) => row.errors.length);
   const labels = { opening: "Abrindo formulário", "waiting-save": "Preenchida: revise e clique em Salvar no SUAP", saved: "Salvamento confirmado", complete: "Todas as aulas do lote foram preenchidas e salvas manualmente" };

@@ -6,23 +6,25 @@
       .trim();
 
   const getCurrentUnit = () => {
-    const selected = document.querySelector(
-      '.action-bar.search-and-filters select option:checked'
-    );
-
-    if (selected) {
-      return {
-        value: selected.value,
-        label: cleanText(selected.textContent),
-      };
+    // Read the diary filter, never a select inserted by the Add Class dialog.
+    const selects = Array.from(document.querySelectorAll('.action-bar.search-and-filters select'))
+      .filter((select) => !select.closest('#aula_form, [role="dialog"], .modal'));
+    for (const select of selects) {
+      const option = select.options[select.selectedIndex];
+      const label = cleanText(option?.textContent);
+      const namedUnit = /etapa|unidade/i.test(select.name || select.id || "");
+      const labelledUnit = /unidade|etapa/i.test(label);
+      if ((namedUnit || labelledUnit) && /^[123]$/.test(String(option?.value))) {
+        return { value: String(option.value), label, source: "page" };
+      }
     }
-
-    const title = document.querySelector('.box > h3');
-    const match = cleanText(title?.textContent).match(/Unidade\s+(\d+)/i);
-
-    return match
-      ? { value: match[1], label: `Unidade ${match[1]}` }
-      : { value: "", label: "" };
+    const titles = Array.from(document.querySelectorAll('.box > h3'))
+      .filter((title) => !title.closest('#aula_form, [role="dialog"], .modal'));
+    for (const title of titles) {
+      const match = cleanText(title.textContent).match(/Unidade\s+([123])(?:\D|$)/i);
+      if (match) return { value: match[1], label: `Unidade ${match[1]}`, source: "page" };
+    }
+    return { value: "", label: "", source: "unknown" };
   };
 
   const getAddClassUrl = () => {
@@ -85,7 +87,11 @@
     };
   };
 
-  const findClassForm = () => document.querySelector("#aula_form");
+  const findClassForm = () => Array.from(document.querySelectorAll("#aula_form"))
+    .find((form) => form.isConnected && form.getClientRects().length > 0 &&
+      getComputedStyle(form).visibility !== "hidden" &&
+      ["#id_quantidade", "#id_etapa", "#id_data", "#id_formato", "#id_conteudo"]
+        .every((selector) => form.querySelector(selector)));
 
   const getClassFormState = () => {
     const form = findClassForm();
@@ -101,6 +107,8 @@
 
     return {
       ok: true,
+      editing: Array.from(document.querySelectorAll('a[title="Editar"]'))
+        .some((link) => link.href === form.action),
       fields: {
         professor_diario: get("#id_professor_diario")?.value ?? "",
         quantidade: get("#id_quantidade")?.value ?? "",
@@ -112,7 +120,7 @@
     };
   };
 
-  const setNativeValue = (element, value) => {
+  const setNativeValue = (element, value, notify = true) => {
     if (!element) return false;
 
     const prototype =
@@ -125,8 +133,12 @@
     const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
     descriptor?.set?.call(element, String(value ?? ""));
 
-    element.dispatchEvent(new Event("input", { bubbles: true }));
-    element.dispatchEvent(new Event("change", { bubbles: true }));
+    // Batch filling writes native form values without triggering SUAP's reload/reset
+    // handlers. The user still submits the original form through its Save button.
+    if (notify) {
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }
 
     return true;
   };
@@ -160,7 +172,7 @@
     const apply = (selector, key) => {
       if (payload[key] === undefined || payload[key] === null) return;
       const element = form.querySelector(selector);
-      if (setNativeValue(element, payload[key])) applied.push(key);
+      if (setNativeValue(element, payload[key], payload.mode !== "batch")) applied.push(key);
     };
 
     apply("#id_quantidade", "quantidade");
