@@ -20,6 +20,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return true;
     }
 
+    if (message?.type === "SUAP_TOOLS_OPEN_CLASS_FORM") {
+      if (!globalThis.SuapClassParser) {
+        sendResponse({ ok: false, error: "Parser de aulas do SUAP Tools não foi carregado." });
+        return;
+      }
+
+      sendResponse(globalThis.SuapClassParser.openClassForm());
+      return true;
+    }
+
     if (message?.type === "SUAP_TOOLS_GET_CLASS_FORM") {
       if (!globalThis.SuapClassParser) {
         sendResponse({ ok: false, error: "Parser de aulas do SUAP Tools não foi carregado." });
