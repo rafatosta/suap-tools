@@ -56,6 +56,6 @@ export default function ClassesImport({ workspace = false }) {
     </div>
     {workspace && result && !result.columnErrors.length && result.rows.length > 0 &&
       <ClassesBatch key={filename + JSON.stringify(result.rows)} rows={result.rows} onRunningChange={setBatchRunning} />}
-    <p className="muted import-safety">A seleção do arquivo apenas valida e mostra a prévia. O preenchimento começa quando você inicia o lote; o salvamento é manual no SUAP.</p>
+    <p className="muted import-safety">A seleção do arquivo apenas valida e mostra a prévia. O preenchimento começa quando você inicia o lote; o salvamento só é automático se você marcar a opção de envio do lote.</p>
   </section>;
 }

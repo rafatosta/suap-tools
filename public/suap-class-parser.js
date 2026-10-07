@@ -107,6 +107,8 @@
 
     return {
       ok: true,
+      errors: Array.from(form.querySelectorAll(".errorlist, .errornote"))
+        .map((element) => cleanText(element.textContent)).filter(Boolean),
       editing: Array.from(document.querySelectorAll('a[title="Editar"]'))
         .some((link) => link.href === form.action),
       fields: {
@@ -190,6 +192,38 @@
     };
   };
 
+  const submittedForms = new WeakMap();
+  const submitClassForm = (payload = {}) => {
+    if (payload.confirmedAutoSave !== true) return { ok: false, error: "O envio automático não foi autorizado para este lote." };
+    const form = findClassForm();
+    const state = getClassFormState();
+    if (!form || !state.ok || state.editing) return { ok: false, error: "Não há um formulário de nova aula disponível para envio." };
+    const keys = ["quantidade", "etapa", "data", "formato", "conteudo"];
+    const expected = payload.expected;
+    if (!expected || keys.some((key) => expected[key] === undefined || cleanText(state.fields[key]) !== cleanText(expected[key]))) {
+      return { ok: false, error: "A aula mudou antes do envio. Confira o formulário no SUAP." };
+    }
+    const url = new URL(getAddClassUrl() || location.href, location.href);
+    const id = url.pathname.match(/\/edu\/adicionar_aula_diario\/(\d+)(?:\/|$)/)?.[1];
+    if (!id || payload.diary !== `${url.origin}/diario/${id}`) return { ok: false, error: "O diário de destino mudou antes do envio." };
+    if (state.errors.length) return { ok: false, error: "O SUAP indica erros no formulário: " + state.errors.join(" ") };
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return { ok: false, error: "O formulário possui campos inválidos. Confira os avisos do SUAP." };
+    }
+    const save = Array.from(form.querySelectorAll('button, input[type="submit"]'))
+      .find((button) => button.type === "submit" && !button.disabled &&
+        /^(salvar|salvar aula)$/i.test(cleanText(button.textContent || button.value)));
+    if (!save) return { ok: false, error: "O botão Salvar não foi encontrado ou está indisponível." };
+    const fingerprint = JSON.stringify(keys.map((key) => cleanText(expected[key])));
+    if (submittedForms.get(form) === fingerprint) return { ok: false, error: "Esta aula já recebeu uma tentativa de envio. Confira o diário antes de tentar novamente." };
+    submittedForms.set(form, fingerprint);
+    // Use the original Save action, preserving native validation, submit handlers,
+    // professor selection and the CSRF token. Never call form.submit().
+    save.click();
+    return { ok: true, submitted: true, message: "Envio solicitado. Aguardando confirmação do registro no diário." };
+  };
+
   const openClassForm = () => {
     const link = Array.from(
       document.querySelectorAll('a[href*="/edu/adicionar_aula_diario/"]')
@@ -208,5 +242,6 @@
     getClassFormState,
     fillClassForm,
     openClassForm,
+    submitClassForm,
   };
 })();

@@ -37,8 +37,8 @@ export function batchDelay(milliseconds, signal) {
   });
 }
 
-// Only OPEN, GET, EXTRACT and FILL messages are used. Saving remains native/manual.
-export async function fillClassesBatch({ rows, send, signal, onProgress, wait = batchDelay }) {
+// Automatic submission is opt-in and is never retried after an uncertain response.
+export async function fillClassesBatch({ rows, send, signal, onProgress, wait = batchDelay, autoSave = false }) {
   const check = () => { if (signal.aborted) throw new DOMException("Interrompido", "AbortError"); };
   const request = async (type, payload) => { check(); const result = await send(type, payload); check(); return result; };
   const initial = await request("SUAP_TOOLS_EXTRACT_CLASSES");
@@ -109,10 +109,28 @@ export async function fillClassesBatch({ rows, send, signal, onProgress, wait = 
     }
     if (saved) { onProgress({ index, state: "saved", row }); continue; }
     if (!verified) throw new Error("Não foi possível confirmar o preenchimento ou o salvamento da aula. Confira o registro no diário antes de continuar.");
-    onProgress({ index, state: "waiting-save", row });
+    let uncertainSubmission = false;
+    if (autoSave === true) {
+      assertDiary(await request("SUAP_TOOLS_EXTRACT_CLASSES"), diary, unit);
+      onProgress({ index, state: "submitting", row });
+      let submission;
+      try {
+        submission = await request("SUAP_TOOLS_SUBMIT_CLASS_FORM", {
+          confirmedAutoSave: true, expected, diary,
+        });
+      } catch (error) {
+        if (signal.aborted) throw error;
+        // A successful navigation can close the message channel. Observe the
+        // resulting record, never repeat the Save click on an unknown outcome.
+        uncertainSubmission = true;
+      }
+      if (!uncertainSubmission && !submission?.ok) throw new Error(submission?.error || "O SUAP não confirmou a tentativa de envio. Confira o diário antes de continuar.");
+    }
+    onProgress({ index, state: autoSave === true ? "waiting-confirmation" : "waiting-save", row });
     // Observe the actual new record, not just the disappearance of the dialog.
     let failures = 0;
-    for (let attempt = 0; attempt < 1800; attempt++) {
+    const maxAttempts = autoSave === true ? 60 : 1800;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await wait(1000, signal);
       let snapshot;
       try { snapshot = await request("SUAP_TOOLS_EXTRACT_CLASSES"); }
@@ -131,8 +149,14 @@ export async function fillClassesBatch({ rows, send, signal, onProgress, wait = 
         saved = true;
         break;
       }
+      if (autoSave === true) {
+        const state = await request("SUAP_TOOLS_GET_CLASS_FORM");
+        if (state?.errors?.length) throw new Error("O SUAP recusou a aula: " + state.errors.join(" "));
+      }
     }
-    if (!saved) throw new Error("Não foi possível confirmar o salvamento em 30 minutos. Confira o diário antes de continuar.");
+    if (!saved) throw new Error(autoSave === true
+      ? "O envio foi solicitado, mas o registro não foi confirmado em 60 segundos. Confira o diário antes de continuar; a aula não será reenviada automaticamente."
+      : "Não foi possível confirmar o salvamento em 30 minutos. Confira o diário antes de continuar.");
     onProgress({ index, state: "saved", row });
   }
   onProgress({ index: rows.length, state: "complete" });

@@ -316,3 +316,5 @@ footer {
 
 .batch-panel { border-top: 1px solid #eaecf0; margin-top: 16px; padding-top: 12px; }
 .batch-panel select { max-width: 380px; padding: 6px; }
+
+.auto-save-option { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 12px 0 8px; }

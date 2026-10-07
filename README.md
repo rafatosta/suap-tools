@@ -2,7 +2,7 @@
 
 Extensão de navegador para auxiliar tarefas no SUAP.
 
-## v0.2 — notas e aulas
+## v0.4 — notas e aulas
 
 A extensão usa a sessão já autenticada do SUAP no navegador.
 
@@ -23,12 +23,13 @@ A extensão usa a sessão já autenticada do SUAP no navegador.
 - abre o diálogo nativo **Adicionar Aula**;
 - permite informar quantidade, unidade, data, formato e conteúdo na extensão;
 - preenche o formulário nativo já aberto no SUAP;
-- **não envia o formulário**: o usuário deve revisar e clicar em **Salvar** manualmente;
+- no preenchimento avulso, o usuário revisa e clica em **Salvar** manualmente;
+- na importação, permite optar pelo envio automático de todas as aulas com um checkbox, desmarcado por padrão;
 - não exclui aulas.
 
 ## Segurança
 
-A v0.2 não executa salvamento automático.
+O envio automático ocorre somente ao marcar **Enviar e salvar automaticamente todas as aulas deste lote** e iniciar o lote. A opção é desmarcada por padrão e não é persistida entre importações.
 
 No módulo de aulas, a extensão pode preencher os seguintes campos do formulário nativo:
 
@@ -89,8 +90,6 @@ O build será criado em `dist/`.
 ## Próximos passos possíveis
 
 - simulação de lançamento de notas;
-- cadastro de aulas em lote com prévia;
-- salvamento explícito somente após confirmação do usuário.
 
 ## Importação padronizada de aulas
 
@@ -98,7 +97,7 @@ Na aba **Aulas**, clique em **Baixar modelo CSV**, preencha os registros e use
 **Abrir importação em uma aba**. Na nova aba, selecione o arquivo em
 **Importar CSV/XLSX**. A seleção ocorre fora do popup para que a perda de foco
 não feche a interface nem descarte a prévia. A seleção do arquivo apenas valida e simula localmente. O preenchimento só
-começa ao iniciar o lote; a extensão nunca salva aulas automaticamente.
+começa ao iniciar o lote; o envio automático depende da opção marcada pelo usuário.
 
 | Coluna | Regra |
 | --- | --- |
@@ -129,10 +128,11 @@ Validação automatizada: `npm test`. Build da extensão: `npm run build`.
 1. Abra Registro de Aulas no diário e selecione a unidade do arquivo.
 2. Na aba de importação, carregue o arquivo e corrija todos os erros.
 3. Clique em **Buscar abas do SUAP** e selecione o diário de destino.
-4. Clique em **Iniciar preenchimento automático**.
-5. No SUAP, revise a aula preenchida e clique manualmente em **Salvar**.
-6. A extensão confirma o novo registro no diário e preenche a próxima aula
-   automaticamente. Repita a revisão e o salvamento até concluir o lote.
+4. Escolha o modo de salvamento no checkbox:
+   - **Desmarcado** (padrão): clique em **Iniciar preenchimento automático**, revise cada aula no SUAP e clique manualmente em **Salvar**.
+   - **Marcado**: clique em **Iniciar envio automático**. A extensão preenche e aciona o botão Salvar original para cada aula.
+5. A extensão confirma cada novo registro no diário antes de avançar para a próxima aula.
+6. Aguarde o contador confirmar todo o lote. A opção e o diário não podem ser alterados durante a execução.
 
 Mantenha a aba de importação aberta durante o lote. O destino fica vinculado à
 aba escolhida, independentemente de qual aba estiver ativa. Formulários com
@@ -143,8 +143,8 @@ O avanço exige um novo registro identificável na tabela, com os mesmos dados
 importados, e o formulário fechado; fechar ou cancelar o formulário não
 confirma salvamento.
 
-**Interromper lote** cancela apenas os próximos passos. Não fecha, salva ou
-exclui a aula atual. Confira o formulário e o diário antes de continuar. A
+**Interromper lote** cancela os próximos passos. Um envio já iniciado pode
+terminar no SUAP; interromper não desfaz nem exclui aulas. Confira o formulário e o diário antes de continuar. A
 contagem de aulas salvas permanece enquanto a aba estiver aberta; fechar ou
 recarregar descarta o acompanhamento. Não importe novamente aulas já salvas.
 
@@ -164,3 +164,16 @@ registro no diário e confirma o salvamento, inclusive na última aula. A
 conferência tolera um breve atraso de atualização da tabela e não preenche
 novamente uma aula que acabou de ser salva. Apenas fechar o diálogo sem um
 novo registro correspondente continua sem contar como salvamento.
+
+## Envio automático opcional na v0.4
+
+Antes de enviar, a extensão verifica que o formulário corresponde à linha
+importada, pertence ao diário escolhido e passa pela validação nativa. Usa o
+botão Salvar existente, mantendo o professor e o token CSRF originais.
+
+O clique em Salvar é uma tentativa de envio, não uma confirmação: somente o
+novo registro no diário incrementa o contador. Erros retornados pelo SUAP
+interrompem o lote. Se a página navegar e a resposta do envio se perder, a
+extensão procura o registro sem reenviar a aula. Após 60 segundos sem
+confirmação, o lote para e pede a conferência do diário. Não há repetição
+automática do envio.

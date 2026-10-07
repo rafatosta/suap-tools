@@ -34,3 +34,17 @@ test("file selection stays in the dedicated tab, outside the transient popup", a
     assert.doesNotMatch(popup, /type="file"/);
   } finally { delete globalThis.window; }
 });
+
+test("automatic saving is visibly optional and unchecked by default", async () => {
+  const bundle = await build({ configFile: false, esbuild: { jsx: "automatic" }, logLevel: "silent",
+    build: { ssr: new URL("../src/components/ClassesBatch.jsx", import.meta.url).pathname, write: false } });
+  const code = bundle.output.find((chunk) => chunk.type === "chunk" && chunk.isEntry).code
+    .replace(/from (["'])(react(?:\/[^"']*)?)\1/g,
+      (_, quote, name) => `from ${quote}${import.meta.resolve(name)}${quote}`);
+  const { default: ClassesBatch } = await import("data:text/javascript;base64," + Buffer.from(code).toString("base64"));
+  const html = renderToStaticMarkup(createElement(ClassesBatch, { rows: [], onRunningChange: () => {} }));
+  assert.match(html, /type="checkbox"/);
+  assert.doesNotMatch(html, /checked=""/);
+  assert.match(html, /Enviar e salvar automaticamente todas as aulas deste lote/);
+  assert.match(html, /Desmarcado: você revisa e clica em Salvar/);
+});

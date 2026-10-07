@@ -144,3 +144,86 @@ test("a saved record that appears after a short reload is confirmed without refi
   assert.equal(state.events.filter((event) => event === "SUAP_TOOLS_FILL_CLASS_FORM").length, 1);
   assert.equal(state.events.at(-1), "complete");
 });
+
+test("manual mode never sends a submission message", async () => {
+  const state = scenario();
+  await fillClassesBatch(state);
+  assert.ok(!state.events.includes("SUAP_TOOLS_SUBMIT_CLASS_FORM"));
+});
+function automaticScenario() {
+  const state = scenario();
+  state.autoSave = true;
+  state.wait = async () => {};
+  const original = state.send;
+  state.send = async (type, payload) => {
+    if (type === "SUAP_TOOLS_SUBMIT_CLASS_FORM") {
+      state.events.push(type);
+      assert.equal(payload.confirmedAutoSave, true);
+      const row = state.rows.find((row) => row.data === payload.expected.data);
+      state.simulateSave(row);
+      return { ok: true, submitted: true };
+    }
+    return original(type, payload);
+  };
+  return state;
+}
+test("opt-in saving submits each class exactly once and confirms the whole batch", async () => {
+  const state = automaticScenario();
+  await fillClassesBatch(state);
+  assert.equal(state.events.filter((event) => event === "SUAP_TOOLS_SUBMIT_CLASS_FORM").length, 2);
+  assert.equal(state.records.length, 2);
+  assert.equal(state.events.at(-1), "complete");
+});
+test("a lost submit response is confirmed from the diary without re-sending", async () => {
+  const state = automaticScenario();
+  const original = state.send;
+  state.send = async (type, payload) => {
+    const result = await original(type, payload);
+    if (type === "SUAP_TOOLS_SUBMIT_CLASS_FORM") throw new Error("Message channel closed during navigation");
+    return result;
+  };
+  await fillClassesBatch(state);
+  assert.equal(state.events.filter((event) => event === "SUAP_TOOLS_SUBMIT_CLASS_FORM").length, 2);
+  assert.equal(state.events.at(-1), "complete");
+});
+test("submission failure stops before opening or submitting the next row", async () => {
+  const state = automaticScenario();
+  const original = state.send;
+  let attempts = 0;
+  state.send = async (type, payload) => type === "SUAP_TOOLS_SUBMIT_CLASS_FORM"
+    ? (++attempts, { ok: false, error: "Campos inválidos" }) : original(type, payload);
+  await assert.rejects(fillClassesBatch(state), /Campos inválidos/);
+  assert.equal(attempts, 1);
+  assert.equal(state.events.filter((event) => event === "SUAP_TOOLS_OPEN_CLASS_FORM").length, 1);
+});
+test("an unconfirmed automatic submission times out without retrying or advancing", async () => {
+  const state = automaticScenario();
+  const original = state.send;
+  let attempts = 0;
+  state.send = async (type, payload) => type === "SUAP_TOOLS_SUBMIT_CLASS_FORM"
+    ? (++attempts, { ok: true, submitted: true }) : original(type, payload);
+  await assert.rejects(fillClassesBatch(state), /não será reenviada/);
+  assert.equal(attempts, 1);
+  assert.ok(!state.events.includes("saved"));
+});
+
+test("interrupting before submission prevents the automatic Save message", async () => {
+  const state = automaticScenario();
+  const original = state.onProgress;
+  state.onProgress = (next) => { original(next); if (next.state === "submitting") state.abort.abort(); };
+  await assert.rejects(fillClassesBatch(state), { name: "AbortError" });
+  assert.ok(!state.events.includes("SUAP_TOOLS_SUBMIT_CLASS_FORM"));
+});
+test("server validation errors stop the automatic queue", async () => {
+  const state = automaticScenario();
+  const original = state.send;
+  let submitted = false;
+  state.send = async (type, payload) => {
+    if (type === "SUAP_TOOLS_SUBMIT_CLASS_FORM") { submitted = true; return { ok: true, submitted: true }; }
+    const result = await original(type, payload);
+    if (submitted && type === "SUAP_TOOLS_GET_CLASS_FORM") result.errors = ["Data fora do período letivo"];
+    return result;
+  };
+  await assert.rejects(fillClassesBatch(state), /Data fora do período letivo/);
+  assert.equal(state.events.filter((event) => event === "SUAP_TOOLS_OPEN_CLASS_FORM").length, 1);
+});

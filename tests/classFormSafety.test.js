@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 const source = await readFile(new URL("../public/suap-class-parser.js", import.meta.url), "utf8");
-function parser({ resetOnChange = false, visible = true } = {}) {
+function parser({ resetOnChange = false, visible = true, valid = true, errors = [], saveDisabled = false } = {}) {
   class Input { constructor(value = "") { this._value = value; } set value(value) { this._value = value; } get value() { return this._value; } dispatchEvent(event) { if (resetOnChange && event.type === "change") queueMicrotask(() => { for (const input of Object.values(fields)) input._value = ""; }); } }
   class Select extends Input { set value(value) { this._value = value; } get value() { return this._value; } constructor(options) { super(); this.options = options.map((value) => ({ value })); } }
   class Textarea extends Input { set value(value) { this._value = value; } get value() { return this._value; } }
@@ -13,8 +13,13 @@ function parser({ resetOnChange = false, visible = true } = {}) {
     '#id_conteudo': new Textarea(), '#id_professor_diario': new Input('unchanged'),
   };
   let submits = 0;
-  const form = { isConnected: true, getClientRects: () => visible ? [{}] : [], querySelector: (selector) => fields[selector], submit: () => submits++, requestSubmit: () => submits++ };
-  const context = vm.createContext({ document: { querySelector: () => form, querySelectorAll: (selector) => selector === "#aula_form" ? [form] : [] },
+  const save = { type: "submit", textContent: "Salvar", disabled: saveDisabled, click: () => submits++ };
+  const link = { href: "https://suap.ifba.edu.br/edu/adicionar_aula_diario/42/", textContent: "Adicionar Aula" };
+  const form = { checkValidity: () => valid, reportValidity: () => {},
+    querySelectorAll: (selector) => selector === '.errorlist, .errornote' ? errors.map((textContent) => ({ textContent })) : [save],
+    isConnected: true, getClientRects: () => visible ? [{}] : [], querySelector: (selector) => fields[selector], submit: () => submits++, requestSubmit: () => submits++ };
+  const context = vm.createContext({ document: { querySelector: () => form, querySelectorAll: (selector) => selector === "#aula_form" ? [form] : selector.includes("adicionar_aula_diario") ? [link] : [] },
+    location: { href: "https://suap.ifba.edu.br/edu/diario/42/" }, URL, WeakMap,
     getComputedStyle: () => ({ visibility: "visible" }),
     HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: Textarea,
     Event: class { constructor(type) { this.type = type; } }, console });
@@ -66,4 +71,32 @@ test("unit detection ignores dialog fields and unrelated page filters", () => {
   vm.runInContext(source, context);
   const result = context.SuapClassParser.extractClasses();
   assert.equal(result.metadata.unit.value, '1');
+});
+
+const expected = { quantidade: '2', etapa: '1', data: '07/10/2026', formato: '1', conteudo: 'Aula' };
+const authorized = { confirmedAutoSave: true, expected, diary: 'https://suap.ifba.edu.br/diario/42' };
+test("native saving requires explicit authorization and only clicks Save once", () => {
+  const state = parser();
+  state.api.fillClassForm({ ...expected, mode: 'batch' });
+  assert.equal(state.api.submitClassForm({ expected }).ok, false);
+  assert.equal(state.submits(), 0);
+  assert.equal(state.api.submitClassForm(authorized).ok, true);
+  assert.equal(state.submits(), 1);
+  assert.equal(state.api.submitClassForm(authorized).ok, false);
+  assert.equal(state.submits(), 1);
+  assert.equal(state.fields['#id_professor_diario'].value, 'unchanged');
+});
+test("invalid native fields, server errors, wrong diary, changed values and disabled Save block submission", () => {
+  for (const options of [{ valid: false }, { errors: ['Data inválida'] }, { saveDisabled: true }]) {
+    const state = parser(options);
+    state.api.fillClassForm({ ...expected, mode: 'batch' });
+    assert.equal(state.api.submitClassForm(authorized).ok, false);
+    assert.equal(state.submits(), 0);
+  }
+  const state = parser();
+  state.api.fillClassForm({ ...expected, mode: 'batch' });
+  assert.equal(state.api.submitClassForm({ ...authorized, diary: 'https://suap.ifba.edu.br/diario/43' }).ok, false);
+  state.fields['#id_conteudo'].value = 'Alterado';
+  assert.equal(state.api.submitClassForm(authorized).ok, false);
+  assert.equal(state.submits(), 0);
 });

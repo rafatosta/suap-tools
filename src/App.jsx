@@ -173,10 +173,10 @@ function App() {
     return <main className="app import-workspace">
       <header className="header">
         <div><h1>SUAP Tools · Aulas</h1><p>Importação e prévia</p></div>
-        <span className="readonly-badge">SAFE MODE</span>
+        <span className="readonly-badge">ENVIO OPCIONAL</span>
       </header>
       <ClassesImport workspace />
-      <footer>Mantenha esta aba aberta durante a revisão. Os dados são descartados ao recarregar ou fechar esta aba. Nenhuma aula é salva automaticamente.</footer>
+      <footer>Mantenha esta aba aberta durante a revisão. Os dados são descartados ao recarregar ou fechar esta aba. O envio automático depende da opção escolhida antes de iniciar o lote.</footer>
     </main>;
   }
 
@@ -185,7 +185,7 @@ function App() {
       <header className="header">
         <div>
           <h1>SUAP Tools</h1>
-          <p>v0.3.2 · notas e aulas</p>
+          <p>v0.4.0 · notas e aulas</p>
         </div>
         <span className="readonly-badge">SAFE MODE</span>
       </header>
@@ -320,7 +320,7 @@ function App() {
                   Ação Adicionar Aula disponível
                 </DiagnosticItem>
                 <DiagnosticItem ok={!classDiagnostics.writableActionsUsed}>
-                  Nenhuma aula salva automaticamente
+                  Leitura das aulas não altera registros
                 </DiagnosticItem>
               </div>
             ) : (
@@ -469,8 +469,8 @@ function App() {
       )}
 
       <footer>
-        O SUAP Tools não salva aulas automaticamente nesta versão. Exclusão de aulas
-        também não é realizada.
+        O envio automático de aulas é opcional na importação. Exclusão de aulas
+        não é realizada.
       </footer>
     </main>
   );
